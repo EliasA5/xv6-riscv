@@ -1,7 +1,6 @@
 #include "types.h"
 #include "riscv.h"
 #include "defs.h"
-#include "date.h"
 #include "param.h"
 #include "memlayout.h"
 #include "spinlock.h"
@@ -49,11 +48,10 @@ sys_wait(void)
 uint64
 sys_sbrk(void)
 {
-  int addr;
+  uint64 addr;
   int n;
 
-  if(argint(0, &n) < 0)
-    return -1;
+  argint(0, &n);
   addr = myproc()->sz;
   if(growproc(n) < 0)
     return -1;
@@ -66,12 +64,11 @@ sys_sleep(void)
   int n;
   uint ticks0;
 
-  if(argint(0, &n) < 0)
-    return -1;
+  argint(0, &n);
   acquire(&tickslock);
   ticks0 = ticks;
   while(ticks - ticks0 < n){
-    if(myproc()->killed){
+    if(killed(myproc())){
       release(&tickslock);
       return -1;
     }
@@ -86,8 +83,7 @@ sys_kill(void)
 {
   int pid;
 
-  if(argint(0, &pid) < 0)
-    return -1;
+  argint(0, &pid);
   return kill(pid);
 }
 
