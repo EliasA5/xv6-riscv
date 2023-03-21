@@ -10,5 +10,5 @@ main(void)
   printf("Memory size of the process after calling memsize: %d\n", memsize());
   free(tmp); 
   printf("Memory size of the process after the release: %d\n", memsize());
-  exit(0);
+  exit(0,0);
 }
