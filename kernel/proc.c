@@ -415,12 +415,9 @@ wait(uint64 addr, uint64 msg_buf)
             release(&wait_lock);
             return -1;
           }
-          //parent doesn't want to recieve exit msg
-          if (msg_buf == 0)
-            ;
-          else if(msg_buf != 0 && copyout(p->pagetable, msg_buf, (char *)&np->exit_msg,
-                                  sizeof(*np->exit_msg)*MAXMSGLEN) < 0) {
-            release(&np->lock);
+          if(msg_buf != 0 && copyout(p->pagetable, msg_buf, (char *)&pp->exit_msg,
+                                  sizeof(*pp->exit_msg)*MAXMSGLEN) < 0) {
+            release(&pp->lock);
             release(&wait_lock);
             return -1;
           }

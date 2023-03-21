@@ -12,10 +12,8 @@ sys_exit(void)
   int n;
   uint64 addr;
   char msg[MAXMSGLEN];
-  if(argint(0, &n) < 0)
-    return -1;
-  if(argaddr(1, &addr) < 0)
-    return -1;
+  argint(0, &n);
+  argaddr(1, &addr);
   addr == 0 ? (*msg = 0) : argstr(1, msg, MAXMSGLEN) < 0;
   exit(n, msg);
   return 0;  // not reached
@@ -38,10 +36,8 @@ sys_wait(void)
 {
   uint64 p;
   uint64 buf;
-  if(argaddr(0, &p) < 0)
-    return -1;
-  if(argaddr(1, &buf) < 0)
-    return -1;
+  argaddr(0, &p); 
+  argaddr(1, &buf);
   return wait(p, buf);
 }
 

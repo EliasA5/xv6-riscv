@@ -2432,39 +2432,16 @@ textwrite(char *s)
   if(pid == 0) {
     volatile int *addr = (int *) 0;
     *addr = 10;
-    exit(1);
+    exit(1,0);
   } else if(pid < 0){
     printf("%s: fork failed\n", s);
-    exit(1);
+    exit(1,0);
   }
-  wait(&xstatus);
+  wait(&xstatus,0);
   if(xstatus == -1)  // kernel killed child?
-    exit(0);
+    exit(0,0);
   else
-    exit(xstatus);
-}
-
-// check that writes to text segment fault
-void
-textwrite(char *s)
-{
-  int pid;
-  int xstatus;
-  
-  pid = fork();
-  if(pid == 0) {
-    volatile int *addr = (int *) 0;
-    *addr = 10;
-    exit(1);
-  } else if(pid < 0){
-    printf("%s: fork failed\n", s);
-    exit(1);
-  }
-  wait(&xstatus);
-  if(xstatus == -1)  // kernel killed child?
-    exit(0);
-  else
-    exit(xstatus);
+    exit(xstatus,0);
 }
 
 // regression test. copyin(), copyout(), and copyinstr() used to cast
@@ -2479,7 +2456,7 @@ pgbug(char *s)
   exec(big, argv);
   pipe(big);
 
-  exit(0);
+  exit(0,0);
 }
 
 // regression test. does the kernel panic if a process sbrk()s its
@@ -2591,7 +2568,7 @@ badarg(char *s)
     exec("echo", argv);
   }
   
-  exit(0);
+  exit(0,0);
 }
 
 struct test {
@@ -2679,7 +2656,7 @@ bigdir(char *s)
   fd = open("bd", O_CREATE);
   if(fd < 0){
     printf("%s: bigdir create failed\n", s);
-    exit(1);
+    exit(1,0);
   }
   close(fd);
 
@@ -2690,7 +2667,7 @@ bigdir(char *s)
     name[3] = '\0';
     if(link("bd", name) != 0){
       printf("%s: bigdir link(bd, %s) failed\n", s, name);
-      exit(1);
+      exit(1,0);
     }
   }
 
@@ -2702,7 +2679,7 @@ bigdir(char *s)
     name[3] = '\0';
     if(unlink(name) != 0){
       printf("%s: bigdir unlink failed", s);
-      exit(1);
+      exit(1,0);
     }
   }
 }
@@ -2719,7 +2696,7 @@ manywrites(char *s)
     int pid = fork();
     if(pid < 0){
       printf("fork failed\n");
-      exit(1);
+      exit(1,0);
     }
 
     if(pid == 0){
@@ -2734,13 +2711,13 @@ manywrites(char *s)
           int fd = open(name, O_CREATE | O_RDWR);
           if(fd < 0){
             printf("%s: cannot create %s\n", s, name);
-            exit(1);
+            exit(1,0);
           }
           int sz = sizeof(buf);
           int cc = write(fd, buf, sz);
           if(cc != sz){
             printf("%s: write(%d) ret %d\n", s, sz, cc);
-            exit(1);
+            exit(1,0);
           }
           close(fd);
         }
@@ -2748,17 +2725,17 @@ manywrites(char *s)
       }
 
       unlink(name);
-      exit(0);
+      exit(0,0);
     }
   }
 
   for(int ci = 0; ci < nchildren; ci++){
     int st = 0;
-    wait(&st);
+    wait(&st,0);
     if(st != 0)
-      exit(st);
+      exit(st,0);
   }
-  exit(0);
+  exit(0,0);
 }
 
 // regression test. does write() with an invalid buffer pointer cause
@@ -2972,13 +2949,13 @@ run(void f(char *), char *s) {
   printf("test %s: ", s);
   if((pid = fork()) < 0) {
     printf("runtest: fork error\n");
-    exit(1);
+    exit(1,0);
   }
   if(pid == 0) {
     f(s);
-    exit(0);
+    exit(0,0);
   } else {
-    wait(&xstatus);
+    wait(&xstatus,0);
     if(xstatus != 0) 
       printf("FAILED\n");
     else
@@ -3114,11 +3091,11 @@ main(int argc, char *argv[])
     justone = argv[1];
   } else if(argc > 1){
     printf("Usage: usertests [-c] [-C] [-q] [testname]\n");
-    exit(1);
+    exit(1,0);
   }
   if (drivetests(quick, continuous, justone)) {
-    exit(1);
+    exit(1,0);
   }
   printf("ALL TESTS PASSED\n");
-  exit(0);
+  exit(0,0);
 }
