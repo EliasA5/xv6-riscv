@@ -376,7 +376,8 @@ exit(int status, const char* exit_msg)
   acquire(&p->lock);
 
   p->xstate = status;
-  safestrcpy(p->exit_msg, exit_msg, sizeof(p->exit_msg));
+  if(exit_msg != 0)
+      safestrcpy(p->exit_msg, exit_msg, sizeof(p->exit_msg));
   p->state = ZOMBIE;
 
   release(&wait_lock);
@@ -415,7 +416,7 @@ wait(uint64 addr, uint64 msg_buf)
             release(&wait_lock);
             return -1;
           }
-          if(msg_buf != 0 && copyout(p->pagetable, msg_buf, (char *)&pp->exit_msg,
+          if(msg_buf != 0 && copyout(p->pagetable, msg_buf, pp->exit_msg,
                                   sizeof(*pp->exit_msg)*MAXMSGLEN) < 0) {
             release(&pp->lock);
             release(&wait_lock);
