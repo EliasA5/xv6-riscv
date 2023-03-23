@@ -343,6 +343,7 @@ reparent(struct proc *p)
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait().
+// call exit from the kernel with exit_msg = "". 
 void
 exit(int status, const char* exit_msg)
 {
@@ -376,8 +377,7 @@ exit(int status, const char* exit_msg)
   acquire(&p->lock);
 
   p->xstate = status;
-  if(exit_msg != 0)
-      safestrcpy(p->exit_msg, exit_msg, sizeof(p->exit_msg));
+  safestrcpy(p->exit_msg, exit_msg, sizeof(p->exit_msg));
   p->state = ZOMBIE;
 
   release(&wait_lock);
