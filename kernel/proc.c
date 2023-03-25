@@ -102,6 +102,28 @@ allocpid()
   return pid;
 }
 
+//TODO:fix me!!
+// pp lock must be held before calling setaccumulator
+void
+setaccumulator(struct proc *pp){
+  struct proc *p;
+  long long min_accum = 0xFFFFFFFFFFFFFFFF;
+  int found_runnable = 0;
+  for (p = proc; p < &proc[NPROC]; p++)
+  {
+      if (p != myproc() && p != pp) {
+        acquire(&p->lock);
+        if ((p->state == RUNNING || p->state == RUNNABLE) && (found_runnable = 1) && (p->accumulator < min_accum))
+          min_accum = p->accumulator;
+        release(&p->lock);
+      }
+  }
+  if (found_runnable == 0){
+    min_accum = 0;
+  }
+  pp->accumulator = min_accum;
+}
+
 // Look in the process table for an UNUSED proc.
 // If found, initialize state required to run in the kernel,
 // and return with p->lock held.
@@ -124,7 +146,8 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
-
+  p->ps_priority = 5;
+  setaccumulator(p);
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
@@ -165,6 +188,9 @@ freeproc(struct proc *p)
   p->pid = 0;
   p->parent = 0;
   p->name[0] = 0;
+  p->exit_msg[0] = 0;
+  p->accumulator = 0;
+  p->ps_priority = 0;
   p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
@@ -581,6 +607,7 @@ wakeup(void *chan)
     if(p != myproc()){
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
+        setaccumulator(p);
         p->state = RUNNABLE;
       }
       release(&p->lock);
