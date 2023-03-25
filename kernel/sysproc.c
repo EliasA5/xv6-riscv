@@ -114,3 +114,17 @@ sys_set_ps_priority(void)
   myproc()->ps_priority = n;
   return 0;
 }
+
+uint64
+sys_set_policy(void){
+  int n;
+
+  argint(0, &n);
+  if(n < 0 || n > 2){
+    return -1;
+  }
+  
+  set_sched_policy(n);
+
+  return 0; 
+}

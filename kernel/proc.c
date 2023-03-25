@@ -15,6 +15,10 @@ struct proc *initproc;
 int nextpid = 1;
 struct spinlock pid_lock;
 
+// Scheduling policy, 0 for default xv6 scheduling, 1 for Priority Scheduling, 2 for Completely Fair Scheduling (CFS).
+int sched_policy;
+struct spinlock sched_policy_lock;
+
 extern void forkret(void);
 static void freeproc(struct proc *p);
 
@@ -124,6 +128,13 @@ setaccumulator(struct proc *pp){
   pp->accumulator = min_accum;
 }
 
+void
+set_sched_policy(int n)
+{
+  acquire(&sched_policy_lock);
+  sched_policy = n;
+  release(&sched_policy_lock);
+}
 // Look in the process table for an UNUSED proc.
 // If found, initialize state required to run in the kernel,
 // and return with p->lock held.
@@ -481,9 +492,19 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
-  
+  /* int current_sched; */
+  initlock(&sched_policy_lock, "scheduling_policy");
+  acquire(&sched_policy_lock);
+  sched_policy = 0;
+  release(&sched_policy_lock);
+
   c->proc = 0;
   for(;;){
+
+    /* acquire(&sched_policy_lock); */
+    /* current_sched = sched_policy; */
+    /* release(&sched_policy_lock); */
+
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
