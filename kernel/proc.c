@@ -106,13 +106,14 @@ allocpid()
   return pid;
 }
 
-//TODO:fix me!!
 // pp lock must be held before calling setaccumulator
 void
 setaccumulator(struct proc *pp){
   struct proc *p;
   long long min_accum = 0xFFFFFFFFFFFFFFFF;
   int found_runnable = 0;
+  // release lock so calls to wakeup don't cause a deadlock
+  release(&pp->lock);
   for (p = proc; p < &proc[NPROC]; p++)
   {
       if (p != myproc() && p != pp) {
@@ -125,6 +126,8 @@ setaccumulator(struct proc *pp){
   if (found_runnable == 0){
     min_accum = 0;
   }
+  // relock the process
+  acquire(&pp->lock);
   pp->accumulator = min_accum;
 }
 
