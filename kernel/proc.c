@@ -514,10 +514,14 @@ scheduler(void)
 {
   struct proc *p;
   struct proc *priority_p = proc;
+  struct proc *cfs_p = proc;
   struct cpu *c = mycpu();
   int current_sched;
   long long min_accumulator;
+  int min_cfs;
+  int cfs_prio;
   int found_runnable;
+  int decay_factors[3] = { 75, 100, 125 };
   // default value 0 for original scheduling algorithm
   acquire(&sched_policy_lock);
   sched_policy = 0;
@@ -605,8 +609,46 @@ scheduler(void)
     goto sched_start;
 
   cfs_sched:
-    // TODO implement
-    panic("cfs not implemented");
+    found_runnable = 0;
+    for (p = proc; p < &proc[NPROC]; p++){
+      acquire(&p->lock);
+      if (p->state == RUNNABLE){
+        cfs_prio = decay_factors[p->cfs_priority] * p->rtime/ (p->rtime+p->stime+p->retime + 1); 
+        if (found_runnable == 0){
+          cfs_p = p;
+          found_runnable = 1;
+          min_cfs = cfs_prio;
+        }
+        if (cfs_prio < min_cfs){
+          cfs_p = p;
+          min_cfs = cfs_prio;
+        }
+
+      }
+      release(&p->lock);
+    }
+    if (found_runnable == 0)
+      goto sched_start;
+
+    p = cfs_p;
+    acquire(&p->lock);
+    // proccess might've changed state since we selected it.
+    if(p->state != RUNNABLE){
+      release(&p->lock);
+      goto sched_start;
+    }
+    // Switch to chosen process.  It is the process's job
+    // to release its lock and then reacquire it
+    // before jumping back to us.
+    p->state = RUNNING;
+    c->proc = p;
+    swtch(&c->context, &p->context);
+
+    // Process is done running for now.
+    // It should have changed its p->state before coming back.
+    c->proc = 0;
+    release(&p->lock);
+    goto sched_start;
   }
 }
 
