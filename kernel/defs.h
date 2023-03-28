@@ -108,6 +108,7 @@ int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
 void            set_sched_policy(int);
+int             get_cfs_stats(int, uint64);
 
 // swtch.S
 void            swtch(struct context*, struct context*);

@@ -169,6 +169,10 @@ found:
   p->pid = allocpid();
   p->state = USED;
   p->ps_priority = 5;
+  p->cfs_priority = 1;
+  p->rtime = 0;
+  p->stime = 0;
+  p->retime = 0;
   setaccumulator(p);
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -213,6 +217,10 @@ freeproc(struct proc *p)
   p->exit_msg[0] = 0;
   p->accumulator = 0;
   p->ps_priority = 0;
+  p->cfs_priority = 0;
+  p->rtime = 0;
+  p->stime = 0;
+  p->retime = 0;
   p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
@@ -343,6 +351,9 @@ fork(void)
     return -1;
   }
   np->sz = p->sz;
+
+  // copy parent cfs priority.
+  np->cfs_priority = p->cfs_priority;
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
@@ -650,6 +661,25 @@ void inc_time(void)
   }
 }
 
+// Copies cfs status {cfs_priority, rtime, stime, retime} of procces with pid, into array info.
+// array must be of size 4 atleast, code in kernel must do this.
+int
+get_cfs_stats(int pid, uint64 addr){
+  struct proc *p;
+  int done = 0;
+  int err = -1;
+  for(p = proc; done == 0 && p < &proc[NPROC]; p++){
+    acquire(&p->lock);
+    if(p->pid == pid){
+      int info[4] = {p->cfs_priority, p->rtime, p->stime, p->retime};
+      err = copyout(p->pagetable, addr, (char *)info, sizeof(info));
+      done = 1;
+    }
+    release(&p->lock);
+  }
+
+  return err;
+}
 // Give up the CPU for one scheduling round.
 void
 yield(void)
@@ -834,3 +864,5 @@ procdump(void)
     printf("\n");
   }
 }
+
+

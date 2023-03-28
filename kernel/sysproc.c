@@ -116,15 +116,42 @@ sys_set_ps_priority(void)
 }
 
 uint64
-sys_set_policy(void){
+sys_set_policy(void)
+{
   int n;
 
   argint(0, &n);
-  if(n < 0 || n > 2){
+  if(n < 0 || n > 2)
     return -1;
-  }
   
   set_sched_policy(n);
 
   return 0; 
+}
+
+uint64
+sys_set_cfs_priority(void)
+{
+  int n;
+
+  argint(0, &n);
+  if(n < 0 || n > 2)
+    return -1;
+
+  myproc()->cfs_priority = n;
+
+  return 0; 
+}
+
+uint64
+sys_get_cfs_stats(void)
+{
+  int n;
+  uint64 addr;
+  
+  argint(0, &n);
+  argaddr(1, &addr);
+
+  return get_cfs_stats(n, addr);
+
 }
