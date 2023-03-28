@@ -55,6 +55,7 @@ procinit(void)
   
   initlock(&pid_lock, "nextpid");
   initlock(&wait_lock, "wait_lock");
+  initlock(&sched_policy_lock, "scheduling_policy");
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
       p->state = UNUSED;
@@ -110,7 +111,7 @@ allocpid()
 void
 setaccumulator(struct proc *pp){
   struct proc *p;
-  long long min_accum = 0xFFFFFFFFFFFFFFFF;
+  long long min_accumulator;
   int found_runnable = 0;
   // release lock so calls to wakeup don't cause a deadlock
   release(&pp->lock);
@@ -118,17 +119,24 @@ setaccumulator(struct proc *pp){
   {
       if (p != myproc() && p != pp) {
         acquire(&p->lock);
-        if ((p->state == RUNNING || p->state == RUNNABLE) && (found_runnable = 1) && (p->accumulator < min_accum))
-          min_accum = p->accumulator;
+        if ((p->state == RUNNING || p->state == RUNNABLE)){
+          if(found_runnable == 0){
+            found_runnable = 1;
+            min_accumulator = p->accumulator;
+          }
+          if(p->accumulator < min_accumulator)
+            min_accumulator = p->accumulator;
+        }
         release(&p->lock);
       }
   }
-  if (found_runnable == 0){
-    min_accum = 0;
-  }
   // relock the process
   acquire(&pp->lock);
-  pp->accumulator = min_accum;
+  if(found_runnable)
+    pp->accumulator = min_accumulator;
+  else
+    pp->accumulator = 0;
+  
 }
 
 void
@@ -494,26 +502,41 @@ void
 scheduler(void)
 {
   struct proc *p;
+  struct proc *priority_p = proc;
   struct cpu *c = mycpu();
-  /* int current_sched; */
-  initlock(&sched_policy_lock, "scheduling_policy");
+  int current_sched;
+  long long min_accumulator;
+  int found_runnable;
+  // default value 0 for original scheduling algorithm
   acquire(&sched_policy_lock);
   sched_policy = 0;
   release(&sched_policy_lock);
 
   c->proc = 0;
   for(;;){
-
-    /* acquire(&sched_policy_lock); */
-    /* current_sched = sched_policy; */
-    /* release(&sched_policy_lock); */
+  sched_start:
+    acquire(&sched_policy_lock);
+    current_sched = sched_policy;
+    release(&sched_policy_lock);
 
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
-    for(p = proc; p < &proc[NPROC]; p++) {
+    if (current_sched == 0)
+      goto orig_sched;
+    else if (current_sched == 1)
+      goto priority_sched;
+    else if (current_sched == 2)
+      goto cfs_sched;
+    else
+      panic("scheduling_policy");
+
+  orig_sched:
+    for (p = proc; p < &proc[NPROC]; p++)
+    {
       acquire(&p->lock);
-      if(p->state == RUNNABLE) {
+      if (p->state == RUNNABLE)
+      {
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
@@ -527,6 +550,52 @@ scheduler(void)
       }
       release(&p->lock);
     }
+    goto sched_start;
+
+  priority_sched:
+    found_runnable = 0;
+    for (p = proc; p < &proc[NPROC]; p++){
+      acquire(&p->lock);
+      if (p->state == RUNNABLE){
+        if (found_runnable == 0){
+          priority_p = p;
+          found_runnable = 1;
+          min_accumulator = p->accumulator;
+        }
+        if (p->accumulator < min_accumulator){
+          priority_p = p;
+          min_accumulator = p->accumulator;
+        }
+
+      }
+      release(&p->lock);
+    }
+    if (found_runnable == 0)
+      goto sched_start;
+
+    p = priority_p;
+    acquire(&p->lock);
+    // proccess might've changed state since we selected it.
+    if(p->state != RUNNABLE){
+      release(&p->lock);
+      goto sched_start;
+    }
+    // Switch to chosen process.  It is the process's job
+    // to release its lock and then reacquire it
+    // before jumping back to us.
+    p->state = RUNNING;
+    c->proc = p;
+    swtch(&c->context, &p->context);
+
+    // Process is done running for now.
+    // It should have changed its p->state before coming back.
+    c->proc = 0;
+    release(&p->lock);
+    goto sched_start;
+
+  cfs_sched:
+    // TODO implement
+    panic("cfs not implemented");
   }
 }
 
