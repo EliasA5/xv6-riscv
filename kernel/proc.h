@@ -94,6 +94,10 @@ struct proc {
   int pid;                     // Process ID
   long long accumulator;       // Accumalator value for priority scheduling
   int ps_priority;             // Process Priority between 1 and 10 (including)
+  int cfs_priority;            // Process CFS Priority
+  int rtime;                   // Process run time (state == RUNNING)
+  int stime;                   // Process sleep time (state == SLEEPING)
+  int retime;                  // Process runnable time (state == RUNNABLE)
 
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process

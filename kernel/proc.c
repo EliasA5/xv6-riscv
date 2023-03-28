@@ -626,6 +626,30 @@ sched(void)
   mycpu()->intena = intena;
 }
 
+// increment state times of the process, called each clock tick interrupt
+void inc_time(void)
+{
+  struct proc *p;
+  for(p = proc; p < &proc[NPROC]; p++){
+    acquire(&p->lock);
+    switch (p->state)
+    {
+    case RUNNING:
+      p->rtime++;
+      break;
+    case SLEEPING:
+      p->stime++;
+      break;
+    case RUNNABLE:
+      p->retime++;
+      break;
+    default:
+      break;
+    }
+    release(&p->lock);
+  }
+}
+
 // Give up the CPU for one scheduling round.
 void
 yield(void)
