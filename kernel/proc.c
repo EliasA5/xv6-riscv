@@ -132,11 +132,7 @@ setaccumulator(struct proc *pp){
   }
   // relock the process
   acquire(&pp->lock);
-  if(found_runnable)
-    pp->accumulator = min_accumulator;
-  else
-    pp->accumulator = 0;
-  
+  pp->accumulator = found_runnable ? min_accumulator : 0; 
 }
 
 void
