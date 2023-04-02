@@ -529,7 +529,6 @@ scheduler(void)
 
   c->proc = 0;
   for(;;){
-  sched_start:
     acquire(&sched_policy_lock);
     current_sched = sched_policy;
     release(&sched_policy_lock);
@@ -565,7 +564,7 @@ scheduler(void)
       }
       release(&p->lock);
     }
-    goto sched_start;
+    continue;
 
   priority_sched:
     found_runnable = 0;
@@ -586,14 +585,14 @@ scheduler(void)
       release(&p->lock);
     }
     if (found_runnable == 0)
-      goto sched_start;
+      continue;
 
     p = priority_p;
     acquire(&p->lock);
     // proccess might've changed state since we selected it.
     if(p->state != RUNNABLE){
       release(&p->lock);
-      goto sched_start;
+      continue;
     }
     // Switch to chosen process.  It is the process's job
     // to release its lock and then reacquire it
@@ -606,7 +605,7 @@ scheduler(void)
     // It should have changed its p->state before coming back.
     c->proc = 0;
     release(&p->lock);
-    goto sched_start;
+    continue;
 
   cfs_sched:
     found_runnable = 0;
@@ -628,14 +627,14 @@ scheduler(void)
       release(&p->lock);
     }
     if (found_runnable == 0)
-      goto sched_start;
+      continue;
 
     p = cfs_p;
     acquire(&p->lock);
     // proccess might've changed state since we selected it.
     if(p->state != RUNNABLE){
       release(&p->lock);
-      goto sched_start;
+      continue;
     }
     // Switch to chosen process.  It is the process's job
     // to release its lock and then reacquire it
@@ -648,7 +647,7 @@ scheduler(void)
     // It should have changed its p->state before coming back.
     c->proc = 0;
     release(&p->lock);
-    goto sched_start;
+    continue;
   }
 }
 
