@@ -2,6 +2,9 @@
 #include "kernel/stat.h"
 #include "user/user.h"
 
+#define N 1000000000
+#define M 100000000
+
 int
 main(void)
 {
@@ -12,8 +15,8 @@ main(void)
   if (fork() == 0){
     sleep(1);
     set_cfs_priority(3);
-    for(counter = 0; counter < 1000000000; counter++){
-      if(counter % 100000000 == 0){
+    for(counter = 0; counter < N; counter++){
+      if(counter % M == 0){
         sleep(10);
       }
     }
@@ -27,8 +30,8 @@ main(void)
   if(fork() == 0){
     sleep(2);
     set_cfs_priority(2);
-    for(counter = 0; counter < 1000000000; counter++){
-      if(counter % 100000000 == 0){
+    for(counter = 0; counter < N; counter++){
+      if(counter % M == 0){
         sleep(10);
       }
     }
@@ -40,8 +43,8 @@ main(void)
     
     // Parent
   set_cfs_priority(0); 
-  for (counter = 0; counter < 1000000000; counter++){
-     if (counter % 100000000 == 0){
+  for (counter = 0; counter < N; counter++){
+     if (counter % M == 0){
       sleep(10);
     }
   }
