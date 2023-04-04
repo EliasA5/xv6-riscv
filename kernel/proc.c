@@ -791,6 +791,7 @@ wakeup(void *chan)
     if(p != myproc()){
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
+        p->state=USED;
         setaccumulator(p);
         p->state = RUNNABLE;
       }
