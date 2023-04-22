@@ -295,6 +295,7 @@ fork(void)
 
   pid = np->pid;
 
+  release(&np->kthread[0].lock);
   release(&np->lock);
 
   acquire(&wait_lock);
@@ -486,7 +487,7 @@ sched(void)
   //FIXME
   if(!holding(&p->lock))
     panic("sched p->lock");
-  if(mycpu()->noff != 1)
+  if(mycpu()->noff != 2)
     panic("sched locks");
   if(kt->state == T_RUNNING)
     panic("sched running");
