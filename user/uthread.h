@@ -27,7 +27,7 @@ struct context {
 };
 
 struct uthread {
-    char*               ustack[STACK_SIZE];  // the thread's stack
+    char                ustack[STACK_SIZE];  // the thread's stack
     enum tstate         state;          // FREE, RUNNING, RUNNABLE
     struct context      context;        // uswtch() here to run process
     enum sched_priority priority;       // scheduling priority
