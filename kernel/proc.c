@@ -60,35 +60,11 @@ procinit(void)
   }
 }
 
-// Must be called with interrupts disabled,
-// to prevent race with process being moved
-// to a different CPU.
-int
-cpuid()
-{
-  int id = r_tp();
-  return id;
-}
-
-// Return this CPU's cpu struct.
-// Interrupts must be disabled.
-struct cpu*
-mycpu(void)
-{
-  int id = cpuid();
-  struct cpu *c = &cpus[id];
-  return c;
-}
-
-// Return the current struct proc *, or zero if none.
 struct proc*
-myproc(void)
+myproc()
 {
-  push_off();
-  struct cpu *c = mycpu();
-  struct proc *p = c->proc;
-  pop_off();
-  return p;
+  struct kthread *kt = mykthread();
+  return kt->pp;
 }
 
 int
@@ -668,9 +644,6 @@ procdump(void)
   static char *states[] = {
   [UNUSED]    "unused",
   [USED]      "used",
-  [SLEEPING]  "sleep ",
-  [RUNNABLE]  "runble",
-  [RUNNING]   "run   ",
   [ZOMBIE]    "zombie"
   };
   struct proc *p;

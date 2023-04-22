@@ -8,22 +8,54 @@
 
 extern struct proc proc[NPROC];
 
+
+// Must be called with interrupts disabled,
+// to prevent race with process being moved
+// to a different CPU.
+int
+cpuid()
+{
+  int id = r_tp();
+  return id;
+}
+
+// Return this CPU's cpu struct.
+// Interrupts must be disabled.
+struct cpu*
+mycpu(void)
+{
+  int id = cpuid();
+  struct cpu *c = &cpus[id];
+  return c;
+}
+
+// Return the current struct proc *, or zero if none.
+struct kthread*
+mykthread()
+{
+  push_off();
+  struct cpu *c = mycpu();
+  struct kthread *t = c->thread;
+  pop_off();
+  return t;
+}
+
 void kthreadinit(struct proc *p)
 {
 
+  initlock(&p->tidlock, "thrd_counter");
+
   for (struct kthread *kt = p->kthread; kt < &p->kthread[NKT]; kt++)
   {
-
+    initlock(&kt->lock, "thrd_lock");
+    kt->state = T_UNUSED;
+    kt->pp = p;
     // WARNING: Don't change this line!
     // get the pointer to the kernel stack of the kthread
     kt->kstack = KSTACK((int)((p - proc) * NKT + (kt - p->kthread)));
   }
 }
 
-struct kthread *mykthread()
-{
-  return &myproc()->kthread[0];
-}
 
 struct trapframe *get_kthread_trapframe(struct proc *p, struct kthread *kt)
 {
