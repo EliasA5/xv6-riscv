@@ -1,0 +1,16 @@
+-Wall
+-Werror
+-O
+-fno-omit-frame-pointer
+-ggdb
+-gdwarf-2
+-MD
+-mcmodel=medany
+-ffreestanding
+-fno-common
+-nostdlib
+-mno-relax
+-I
+.
+-I
+./**
