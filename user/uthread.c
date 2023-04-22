@@ -9,7 +9,8 @@ struct uthread *curr_thread;
 void usched(void);
 void usched1(void);
 
-int uthread_create(void (*start_func)(), enum sched_priority priority){
+int uthread_create(void (*start_func)(), enum sched_priority priority)
+{
    struct uthread *t;
    int found = -1;
    for(t = THREADS; found != 0 && t < &THREADS[MAX_UTHREADS]; t++){
@@ -25,17 +26,20 @@ int uthread_create(void (*start_func)(), enum sched_priority priority){
    return found;
 }
 
-void uthread_yield(){
+void uthread_yield()
+{
     curr_thread->state = RUNNABLE;
     usched();
 }
 
-void uthread_exit(){
+void uthread_exit()
+{
     curr_thread->state = FREE; 
     usched();
 }
 
-int uthread_start_all(){
+int uthread_start_all()
+{
     static int started = 0;
     if(started != 0)
         return -1;
@@ -44,21 +48,25 @@ int uthread_start_all(){
     return -1;
 }
 
-enum sched_priority uthread_set_priority(enum sched_priority priority){
+enum sched_priority uthread_set_priority(enum sched_priority priority)
+{
     enum sched_priority prev = curr_thread->priority;
     curr_thread->priority = priority;
     return prev;
 }
 
-enum sched_priority uthread_get_priority(){
+enum sched_priority uthread_get_priority()
+{
     return curr_thread->priority;
 }
 
-struct uthread* uthread_self(){
+struct uthread* uthread_self()
+{
     return curr_thread;
 }
 
-void usched(){
+void usched()
+{
     struct uthread *t;
     struct uthread *to_run;
     int found;
@@ -96,8 +104,9 @@ void usched(){
     
 }
 
-
-void usched1(void){
+// First scheduling for a thread, does not return here
+void usched1(void)
+{
   struct uthread *t;
   struct uthread *dummy = {0};
   int found;
@@ -114,7 +123,6 @@ void usched1(void){
     exit(-1);
   curr_thread->state = RUNNING;
   uswtch(&dummy->context, &curr_thread->context);
-
 }
 
 
