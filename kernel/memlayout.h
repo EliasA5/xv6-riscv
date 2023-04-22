@@ -62,6 +62,6 @@
 //   fixed-size stack
 //   expandable heap
 //   ...
-//   TRAPFRAME (p->trapframe, used by the trampoline)
+//   TRAPFRAME (kt->trapframe, used by the trampoline)
 //   TRAMPOLINE (the same page as in the kernel)
-#define TRAPFRAME (TRAMPOLINE - PGSIZE)
+#define TRAPFRAME(kt_idx) (TRAMPOLINE - PGSIZE + (kt_idx * sizeof(struct trapframe)))
