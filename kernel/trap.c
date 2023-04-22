@@ -89,8 +89,8 @@ usertrap(void)
 void
 usertrapret(void)
 {
-  struct proc *p = myproc();
   struct kthread *kt = mykthread();
+  struct proc *p = kt->pp;
 
   // we're about to switch the destination of traps from
   // kerneltrap() to usertrap(), so turn off interrupts until
@@ -152,7 +152,7 @@ kerneltrap()
   }
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)
+  if(which_dev == 2 && mykthread() != 0 && mykthread()->state == T_RUNNING)
     yield();
 
   // the yield() may have caused some traps to occur,

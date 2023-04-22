@@ -30,7 +30,8 @@ mycpu(void)
   return c;
 }
 
-void kthreadinit(struct proc *p)
+void
+kthreadinit(struct proc *p)
 {
 
   initlock(&p->tidlock, "thrd_counter");
@@ -70,10 +71,8 @@ alloctid(struct proc *p)
   return tid;
 }
 
-static void
+void
 freekthread(struct kthread *kt){
-  //TODO implement me
-
 
   kt->trapframe = 0;
   kt->tid = 0;
@@ -83,12 +82,13 @@ freekthread(struct kthread *kt){
   kt->state = T_UNUSED;
 }
 
-struct trapframe *get_kthread_trapframe(struct proc *p, struct kthread *kt)
+struct trapframe*
+get_kthread_trapframe(struct proc *p, struct kthread *kt)
 {
   return p->base_trapframes + ((int)(kt - p->kthread));
 }
 
-static struct kthread*
+struct kthread*
 allockthread(struct proc *p)
 {
   struct kthread *t;
@@ -128,10 +128,11 @@ void
 forkret(void)
 {
   static int first = 1;
+  struct kthread *kt = mykthread();
 
   // Still holding t->lock from scheduler.
-  release(&mykthread()->lock);
-
+  release(&kt->lock);
+  release(&kt->pp->lock);
   if (first) {
     // File system initialization must be run in the context of a
     // regular process (e.g., because it calls sleep), and thus cannot
@@ -141,12 +142,4 @@ forkret(void)
   }
 
   usertrapret();
-}
-
-
-// TODO: delte this after you are done with task 2.2
-void allocproc_help_function(struct proc *p) {
-  p->kthread->trapframe = get_kthread_trapframe(p, p->kthread);
-
-  p->context.sp = p->kthread->kstack + PGSIZE;
 }

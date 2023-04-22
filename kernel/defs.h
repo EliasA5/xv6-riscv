@@ -8,6 +8,7 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
+struct kthread;
 
 // bio.c
 void            binit(void);
@@ -82,7 +83,6 @@ void            panic(char*) __attribute__((noreturn));
 void            printfinit(void);
 
 // proc.c
-int             cpuid(void);
 void            exit(int);
 int             fork(void);
 int             growproc(int);
@@ -92,8 +92,6 @@ void            proc_freepagetable(pagetable_t, uint64);
 int             kill(int);
 int             killed(struct proc*);
 void            setkilled(struct proc*);
-struct cpu*     mycpu(void);
-struct cpu*     getmycpu(void);
 struct proc*    myproc();
 void            procinit(void);
 void            scheduler(void) __attribute__((noreturn));
@@ -110,9 +108,13 @@ void            procdump(void);
 // kthread.c
 void                kthreadinit(struct proc *);
 struct kthread*     mykthread();
-
-// TODO: delte this after you are done with task 2.2
-void allocproc_help_function(struct proc *p);
+void                freekthread(struct kthread *);
+struct kthread*     allockthread(struct proc *);
+int                 alloctid(struct proc *);
+void                forkret(void);
+struct cpu*         mycpu(void);
+int                 cpuid(void);
+struct cpu*         getmycpu(void);
 
 // swtch.S
 void            swtch(struct context*, struct context*);
