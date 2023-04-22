@@ -1,4 +1,5 @@
-
+#include "types.h"
+#include "param.h"
 // per-process data for the trap handling code in trampoline.S.
 // sits in a page by itself just under the trampoline page in the
 // user page table. not specially mapped in the kernel page table.
@@ -50,10 +51,55 @@ struct trapframe {
   /* 280 */ uint64 t6;
 };
 
+// Saved registers for kernel context switches.
+struct context {
+  uint64 ra;
+  uint64 sp;
+
+  // callee-saved
+  uint64 s0;
+  uint64 s1;
+  uint64 s2;
+  uint64 s3;
+  uint64 s4;
+  uint64 s5;
+  uint64 s6;
+  uint64 s7;
+  uint64 s8;
+  uint64 s9;
+  uint64 s10;
+  uint64 s11;
+};
+
+// Per-CPU state.
+struct cpu {
+  struct kthread *thread;          // The process running on this cpu, or null.
+  struct context context;     // swtch() here to enter scheduler().
+  int noff;                   // Depth of push_off() nesting.
+  int intena;                 // Were interrupts enabled before push_off()?
+};
+
+extern struct cpu cpus[NCPU];
+enum thrdstate { T_UNUSED, T_USED, T_SLEEPING, T_RUNNABLE, T_RUNNING, T_ZOMBIE };
+
 struct kthread
 {
+  
+  struct spinlock lock;
 
-  uint64 kstack;                // Virtual address of kernel stack
+  // t->lock must be held when using these:
+  enum thrdstate state;        // Thread state
+  void *chan;                  // If non-zero, sleeping on chan
+  int killed;                  // If non-zero, have been killed
+  int xstate;                  // Exit status to be returned to parent's wait
+  int tid;                     // Thread ID
 
   struct trapframe *trapframe;  // data page for trampoline.S
+
+  // there are private to the thread, so t->lock need not be held.
+  uint64 kstack;                // Virtual address of kernel stack
+  struct proc *pp;             // Parent Process
+  struct context context; 
+
+
 };
