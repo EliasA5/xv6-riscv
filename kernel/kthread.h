@@ -82,6 +82,7 @@ struct cpu {
 extern struct cpu cpus[NCPU];
 enum thrdstate { T_UNUSED, T_USED, T_SLEEPING, T_RUNNABLE, T_RUNNING, T_ZOMBIE };
 
+// Per Thread Table
 struct kthread
 {
   

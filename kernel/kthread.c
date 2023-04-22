@@ -29,17 +29,6 @@ mycpu(void)
   return c;
 }
 
-// Return the current struct proc *, or zero if none.
-struct kthread*
-mykthread()
-{
-  push_off();
-  struct cpu *c = mycpu();
-  struct kthread *t = c->thread;
-  pop_off();
-  return t;
-}
-
 void kthreadinit(struct proc *p)
 {
 
@@ -56,6 +45,29 @@ void kthreadinit(struct proc *p)
   }
 }
 
+// Return the current struct kthread *, or zero if none.
+struct kthread*
+mykthread()
+{
+  push_off();
+  struct cpu *c = mycpu();
+  struct kthread *t = c->thread;
+  pop_off();
+  return t;
+}
+
+int
+alloctid(struct proc *p)
+{
+  int tid;
+
+  acquire(&p->tidlock);
+  tid = p->tid_counter;
+  p->tid_counter++;
+  release(&p->tidlock);
+
+  return tid;
+}
 
 struct trapframe *get_kthread_trapframe(struct proc *p, struct kthread *kt)
 {
