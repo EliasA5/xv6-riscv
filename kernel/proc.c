@@ -15,7 +15,6 @@ struct proc *initproc;
 int nextpid = 1;
 struct spinlock pid_lock;
 
-extern void forkret(void);
 static void freeproc(struct proc *p);
 
 extern char trampoline[]; // trampoline.S
@@ -117,13 +116,6 @@ found:
     release(&p->lock);
     return 0;
   }
-
-
-  // Set up new context to start executing at forkret,
-  // which returns to user space.
-  memset(&p->context, 0, sizeof(p->context));
-  p->context.ra = (uint64)forkret;
-  p->context.sp = p->kstack + PGSIZE;
 
 
   // TODO: delte this after you are done with task 2.2
@@ -490,27 +482,6 @@ yield(void)
   p->state = RUNNABLE;
   sched();
   release(&p->lock);
-}
-
-// A fork child's very first scheduling by scheduler()
-// will swtch to forkret.
-void
-forkret(void)
-{
-  static int first = 1;
-
-  // Still holding p->lock from scheduler.
-  release(&myproc()->lock);
-
-  if (first) {
-    // File system initialization must be run in the context of a
-    // regular process (e.g., because it calls sleep), and thus cannot
-    // be run from main().
-    first = 0;
-    fsinit(ROOTDEV);
-  }
-
-  usertrapret();
 }
 
 // Atomically release lock and sleep on chan.

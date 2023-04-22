@@ -8,6 +8,7 @@
 
 extern struct proc proc[NPROC];
 
+extern void forkret(void);
 
 // Must be called with interrupts disabled,
 // to prevent race with process being moved
@@ -69,10 +70,79 @@ alloctid(struct proc *p)
   return tid;
 }
 
+static void
+freekthread(struct kthread *kt){
+  //TODO implement me
+
+
+  kt->trapframe = 0;
+  kt->tid = 0;
+  kt->chan = 0;
+  kt->killed = 0;
+  kt->xstate = 0;
+  kt->state = T_UNUSED;
+}
+
 struct trapframe *get_kthread_trapframe(struct proc *p, struct kthread *kt)
 {
   return p->base_trapframes + ((int)(kt - p->kthread));
 }
+
+static struct kthread*
+allockthread(struct proc *p)
+{
+  struct kthread *t;
+  //FIXME lock p->lock 
+  for(t = p->kthread; t < &p->kthread[NKT]; t++) {
+    acquire(&t->lock);
+    if(t->state == T_UNUSED) {
+      goto found;
+    } else {
+      release(&t->lock);
+    }
+  }
+  return 0;
+
+found:
+  t->tid = alloctid(p);
+  t->state = T_USED;
+ 
+  
+  // Allocate a trapframe page.
+  t->trapframe = get_kthread_trapframe(p, t);
+
+  // Set up new context to start executing at forkret,
+  // which returns to user space.
+  memset(&t->context, 0, sizeof(t->context));
+  t->context.ra = (uint64)forkret;
+  t->context.sp = t->kstack + PGSIZE;
+
+  return t;
+}
+
+
+
+// A fork child's very first scheduling by scheduler()
+// will swtch to forkret.
+void
+forkret(void)
+{
+  static int first = 1;
+
+  // Still holding t->lock from scheduler.
+  release(&mykthread()->lock);
+
+  if (first) {
+    // File system initialization must be run in the context of a
+    // regular process (e.g., because it calls sleep), and thus cannot
+    // be run from main().
+    first = 0;
+    fsinit(ROOTDEV);
+  }
+
+  usertrapret();
+}
+
 
 // TODO: delte this after you are done with task 2.2
 void allocproc_help_function(struct proc *p) {
