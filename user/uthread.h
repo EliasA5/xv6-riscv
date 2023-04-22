@@ -33,7 +33,7 @@ struct uthread {
     enum sched_priority priority;       // scheduling priority
 };
 
-extern void uswtch(struct context*, struct context*);
+extern void uswtch(struct context* old, struct context* new);
 
 int uthread_create(void (*start_func)(), enum sched_priority priority);
 
