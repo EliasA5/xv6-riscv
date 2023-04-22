@@ -4,7 +4,7 @@
 #include "user/user.h"
 
 struct uthread THREADS[MAX_UTHREADS];
-struct uthread *curr_thread = 0;
+struct uthread *curr_thread;
 
 void usched(void);
 void usched1(void);
@@ -16,8 +16,9 @@ int uthread_create(void (*start_func)(), enum sched_priority priority){
         if(t->state == FREE){
             found = 0;
             t->priority = priority;
-            t->context.ra = start_func;
-            t->context.sp = t->ustack;
+            memset(&t->context, 0, sizeof(t->context));
+            t->context.ra = (uint64) start_func;
+            t->context.sp = (uint64) t->ustack + STACK_SIZE;
             t->state = RUNNABLE;
         } 
    } 
@@ -40,6 +41,7 @@ int uthread_start_all(){
         return -1;
     started = 1;
     usched1();
+    return -1;
 }
 
 enum sched_priority uthread_set_priority(enum sched_priority priority){
@@ -69,7 +71,7 @@ void usched(){
             found = 1;
             to_run = t;
         }
-        if (t->priority > to_run->priority) {
+        if (t->state == RUNNABLE && t->priority > to_run->priority) {
             to_run = t;
         }
     }
@@ -89,23 +91,30 @@ void usched(){
 
     t = curr_thread;
     curr_thread = to_run;
+    curr_thread->state = RUNNING;
     uswtch(&t->context, &curr_thread->context);
     
 }
 
 
 void usched1(void){
-    struct uthread *t;
-    int found = 0;
-    for (t = THREADS; t < &THREADS[MAX_UTHREADS]; t++) {
-        if (found == 0 && t->state == RUNNABLE)
-            curr_thread = t;
-        if (t->priority > curr_thread->priority)
-            curr_thread = t;
+  struct uthread *t;
+  struct uthread *dummy = {0};
+  int found;
+  found = 0;
+  for (t = THREADS; t < &THREADS[MAX_UTHREADS]; t++) {
+    if (found == 0 && t->state == RUNNABLE){
+      found = 1;
+      curr_thread = t;
     }
-    if (found == 0)
-        exit(-1);
-    struct uthread dummy = {0};
-    uswtch(&dummy.context, &curr_thread->context);
+    if (t->state == RUNNABLE && t->priority > curr_thread->priority)
+      curr_thread = t;
+  }
+  if (found == 0)
+    exit(-1);
+  curr_thread->state = RUNNING;
+  uswtch(&dummy->context, &curr_thread->context);
 
 }
+
+
