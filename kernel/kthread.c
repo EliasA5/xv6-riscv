@@ -72,7 +72,8 @@ alloctid(struct proc *p)
 }
 
 void
-freekthread(struct kthread *kt){
+freekthread(struct kthread *kt)
+{
 
   kt->trapframe = 0;
   kt->tid = 0;
@@ -142,3 +143,46 @@ forkret(void)
 
   usertrapret();
 }
+
+
+
+int
+kthread_create(uint64 start_func, uint64 stack, uint stack_size)
+{
+  struct proc *p = myproc();
+  struct kthread *kt;
+  int tid;
+
+  if((kt = allockthread(p)) == 0)
+    return -1;
+
+  tid = kt->tid;
+
+  kt->trapframe->epc = start_func;
+  kt->trapframe->sp = stack + stack_size;
+  
+  kt->state = T_RUNNABLE; 
+
+  return tid;
+}
+
+int
+kthread_kill(int tid)
+{
+  return -1;
+} 
+
+void
+kthread_exit(int status)
+{
+
+}
+
+int
+kthread_join(int tid, uint64 addr)
+{
+  return -1;
+}
+
+
+

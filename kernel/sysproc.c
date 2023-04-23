@@ -89,3 +89,55 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64
+sys_kthread_create(void)
+{
+  uint64 start_func;
+  uint64 stack;
+  uint stack_size;
+
+  argaddr(0, &start_func);
+  argaddr(1, &stack);
+  argint(2, (int *) &stack_size);
+  if(stack_size > 0)
+    return -1; 
+
+  return kthread_create(start_func, stack, (uint) stack_size); 
+}
+
+uint64
+sys_kthread_id(void)
+{
+  return mykthread()->tid;
+}
+
+uint64
+sys_kthread_kill(void)
+{
+  int tid;
+
+  argint(0, &tid);
+  return kthread_kill(tid);
+}
+
+uint64
+sys_kthread_exit(void)
+{
+  int n;
+
+  argint(0, &n);
+  kthread_exit(n);
+  return 0;  // not reached
+}
+
+uint64
+sys_kthread_join(void)
+{
+  int tid;
+  uint64 p;
+
+  argint(0, &tid);
+  argaddr(1, &p);
+  return kthread_join(tid, p);
+}
