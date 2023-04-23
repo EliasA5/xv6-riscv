@@ -132,7 +132,6 @@ forkret(void)
 
   // Still holding t->lock from scheduler.
   release(&kt->lock);
-  release(&kt->pp->lock);
   if (first) {
     // File system initialization must be run in the context of a
     // regular process (e.g., because it calls sleep), and thus cannot

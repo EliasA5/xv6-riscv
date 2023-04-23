@@ -334,7 +334,7 @@ void
 exit(int status)
 {
   struct proc *p = myproc();
-  struct kthread *kt = mykthread();
+  struct kthread *kt;
 
   if(p == initproc)
     panic("init exiting");
@@ -366,11 +366,17 @@ exit(int status)
   p->xstate = status;
   p->state = ZOMBIE;
   //FIXME
-  acquire(&kt->lock);
-  kt->state = T_ZOMBIE;
-
+  for(kt = p->kthread; kt < &p->kthread[NKT]; kt++){
+    acquire(&kt->lock);
+    kt->state = T_ZOMBIE;
+    release(&kt->lock);  
+  }
+  kt = mykthread();
+  
+  release(&p->lock);
   release(&wait_lock);
 
+  acquire(&kt->lock);
   // Jump into the scheduler, never to return.
   sched();
   panic("zombie exit");
@@ -445,8 +451,12 @@ scheduler(void)
     intr_on();
 
     for(p = proc; p < &proc[NPROC]; p++) {
-      //FIXME
       acquire(&p->lock);
+      if(p->state == UNUSED){
+        release(&p->lock);
+        continue;
+      }
+      release(&p->lock);
       for(kt = p->kthread; kt < &p->kthread[NKT]; kt++){
         acquire(&kt->lock);
         if(kt->state == T_RUNNABLE) {
@@ -463,7 +473,6 @@ scheduler(void)
         }
         release(&kt->lock);
       }
-      release(&p->lock);
     }
   }
 }
@@ -480,14 +489,10 @@ sched(void)
 {
   int intena;
   struct kthread *kt = mykthread();
-  struct proc *p = kt->pp;
 
   if(!holding(&kt->lock))
     panic("sched kt->lock");
-  //FIXME
-  if(!holding(&p->lock))
-    panic("sched p->lock");
-  if(mycpu()->noff != 2)
+  if(mycpu()->noff != 1)
     panic("sched locks");
   if(kt->state == T_RUNNING)
     panic("sched running");
@@ -504,14 +509,10 @@ void
 yield(void)
 {
   struct kthread *kt = mykthread();
-  struct proc *p = kt->pp;
-  //FIXME
-  acquire(&p->lock);
   acquire(&kt->lock);
   kt->state = T_RUNNABLE;
   sched();
   release(&kt->lock);
-  release(&p->lock);
 }
 
 // Atomically release lock and sleep on chan.
@@ -520,7 +521,6 @@ void
 sleep(void *chan, struct spinlock *lk)
 {
   struct kthread *kt = mykthread();
-  struct proc *p = kt->pp;
   
   // Must acquire p->lock in order to
   // change p->state and then call sched.
@@ -528,8 +528,6 @@ sleep(void *chan, struct spinlock *lk)
   // guaranteed that we won't miss any wakeup
   // (wakeup locks p->lock),
   // so it's okay to release lk.
-  //FIXME
-  acquire(&p->lock);  //DOC: sleeplock1
   acquire(&kt->lock);
   
   release(lk);
@@ -545,7 +543,6 @@ sleep(void *chan, struct spinlock *lk)
 
   // Reacquire original lock.
   release(&kt->lock);
-  release(&p->lock);
   acquire(lk);
 }
 
@@ -556,20 +553,16 @@ wakeup(void *chan)
 {
   struct proc *p;
   struct kthread *kt;
-  
   for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      //FIXME
-      for(kt = p->kthread; kt < &p->kthread[NKT]; kt++){
-        if(kt != mykthread()){
-          acquire(&kt->lock);
-          if(kt->state == T_SLEEPING && kt->chan == chan) {
-            kt->state = T_RUNNABLE;
-          }
-          release(&kt->lock);
+    for (kt = p->kthread; kt < &p->kthread[NKT]; kt++) {
+      if (kt != mykthread()) {
+        acquire(&kt->lock);
+        if (kt->state == T_SLEEPING && kt->chan == chan) {
+          kt->state = T_RUNNABLE;
         }
+        release(&kt->lock);
       }
-      release(&p->lock);
+      }
   }
 }
 
@@ -583,7 +576,6 @@ kill(int pid)
   struct kthread *kt;
   for(p = proc; p < &proc[NPROC]; p++){
     acquire(&p->lock);
-    //FIXME
     if(p->pid == pid){
       p->killed = 1;
       for(kt = proc->kthread; kt < &proc->kthread[NKT]; kt++){
