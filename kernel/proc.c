@@ -334,7 +334,7 @@ void
 exit(int status)
 {
   struct proc *p = myproc();
-  struct kthread *kt;
+  struct kthread *kt = mykthread();
 
   if(p == initproc)
     panic("init exiting");
@@ -366,12 +366,7 @@ exit(int status)
   p->xstate = status;
   p->state = ZOMBIE;
   //FIXME
-  for(kt = p->kthread; kt < &p->kthread[NKT]; kt++){
-    acquire(&kt->lock);
-    kt->state = T_ZOMBIE;
-    release(&kt->lock);  
-  }
-  kt = mykthread();
+  kt->state = T_ZOMBIE;
   
   release(&p->lock);
   release(&wait_lock);

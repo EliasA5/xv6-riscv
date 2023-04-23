@@ -5,6 +5,7 @@
 
 struct uthread THREADS[MAX_UTHREADS];
 struct uthread *curr_thread;
+static struct uthread dummy[1] = {0};
 
 void usched(void);
 void usched1(void);
@@ -72,7 +73,7 @@ void usched()
     int found;
     found = 0;
     // search for a thread that has a high priority (if found)
-    for (t = THREADS; t < &THREADS[MAX_UTHREADS]; t++) {
+    for (t = THREADS, to_run = THREADS; t < &THREADS[MAX_UTHREADS]; t++) {
         if (t == curr_thread)
             continue;
         if (found == 0 && t->state == RUNNABLE) {
@@ -108,7 +109,6 @@ void usched()
 void usched1(void)
 {
   struct uthread *t;
-  struct uthread *dummy = {0};
   int found;
   found = 0;
   for (t = THREADS; t < &THREADS[MAX_UTHREADS]; t++) {
