@@ -121,8 +121,6 @@ found:
   return t;
 }
 
-
-
 // A fork child's very first scheduling by scheduler()
 // will swtch to forkret.
 void
@@ -144,8 +142,6 @@ forkret(void)
   usertrapret();
 }
 
-
-
 int
 kthread_create(uint64 start_func, uint64 stack, uint stack_size)
 {
@@ -161,7 +157,9 @@ kthread_create(uint64 start_func, uint64 stack, uint stack_size)
   kt->trapframe->epc = start_func;
   kt->trapframe->sp = stack + stack_size;
   
-  kt->state = T_RUNNABLE; 
+  kt->state = T_RUNNABLE;
+
+  release(&kt->lock);
 
   return tid;
 }
