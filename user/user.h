@@ -1,4 +1,5 @@
 struct stat;
+#define MAX_STACK_SIZE 4000 
 
 // system calls
 int fork(void);
@@ -22,6 +23,11 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+int kthread_create(void *(*start_func)(), void *stack, uint stack_size);
+int kthread_id(void);
+int kthread_kill(int);
+int kthread_exit(int);
+int kthread_join(int, int*);
 
 // ulib.c
 int stat(const char*, struct stat*);

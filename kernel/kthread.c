@@ -10,6 +10,7 @@ extern struct proc proc[NPROC];
 
 extern void forkret(void);
 
+struct spinlock kt_wait_lock;
 // Must be called with interrupts disabled,
 // to prevent race with process being moved
 // to a different CPU.
@@ -72,7 +73,8 @@ alloctid(struct proc *p)
 }
 
 void
-freekthread(struct kthread *kt){
+freekthread(struct kthread *kt)
+{
 
   kt->trapframe = 0;
   kt->tid = 0;
@@ -92,7 +94,6 @@ struct kthread*
 allockthread(struct proc *p)
 {
   struct kthread *t;
-  //FIXME lock p->lock 
   for(t = p->kthread; t < &p->kthread[NKT]; t++) {
     acquire(&t->lock);
     if(t->state == T_UNUSED) {
@@ -120,8 +121,6 @@ found:
   return t;
 }
 
-
-
 // A fork child's very first scheduling by scheduler()
 // will swtch to forkret.
 void
@@ -141,4 +140,151 @@ forkret(void)
   }
 
   usertrapret();
+}
+
+int
+kthread_create(uint64 start_func, uint64 stack, uint stack_size)
+{
+  struct proc *p = myproc();
+  struct kthread *kt;
+  int tid;
+
+  if((kt = allockthread(p)) == 0)
+    return -1;
+
+  tid = kt->tid;
+
+  kt->trapframe->epc = start_func;
+  kt->trapframe->sp = stack + stack_size;
+  
+  kt->state = T_RUNNABLE;
+
+  release(&kt->lock);
+
+  return tid;
+}
+
+void
+kt_setkilled(struct kthread *kt)
+{
+  acquire(&kt->lock);
+  kt->killed = 1;
+  release(&kt->lock);
+}
+
+int
+ktkilled(struct kthread *kt)
+{
+  int k;
+
+  acquire(&kt->lock);
+  k = kt->killed;
+  release(&kt->lock);
+
+  return k;
+}
+
+int
+kthread_kill(int tid)
+{
+  struct proc *p;
+  struct kthread *kt;
+
+  if(tid == -1)
+    return -1;
+
+  p = myproc();
+
+  for(kt = p->kthread; kt < &p->kthread[NKT]; kt++){
+    acquire(&kt->lock);
+    if(kt->tid == tid){
+      kt->killed = 1;
+      if(kt->state == T_SLEEPING)
+        kt->state = T_RUNNABLE;
+      release(&kt->lock);
+      return 0;
+    }
+    release(&kt->lock);
+  }
+
+  return -1;
+} 
+
+void
+kthread_exit(int status)
+{
+
+  struct kthread *t;
+  struct kthread *kt = mykthread();
+  struct proc *p = myproc();
+
+  acquire(&kt_wait_lock);
+
+  // Some thread can be waiting on me to exit
+  wakeup(kt);
+
+  acquire(&kt->lock);
+
+  kt->xstate = status;
+  kt->state = T_ZOMBIE;
+
+  release(&kt->lock);
+  release(&kt_wait_lock);
+
+  for(t = p->kthread; t < &p->kthread[NKT]; t++){
+    acquire(&t->lock);
+    if(t->state != T_UNUSED && t->state != T_ZOMBIE){
+      // found another runnable thread
+      release(&t->lock);
+      acquire(&kt->lock);
+      sched();
+      panic("zombie thread exit");
+    }
+    release(&t->lock);
+  }
+
+  exit(status);
+}
+
+int
+kthread_join(int tid, uint64 addr)
+{
+  struct kthread *t;
+  struct kthread *kt = mykthread();
+  struct proc *p = myproc();
+
+  acquire(&kt_wait_lock);
+
+  for (t = p->kthread; t < &p->kthread[NKT]; t++) {
+    if (t->tid == tid) {
+
+      for (;;) {
+        acquire(&t->lock);
+        if (t->state == T_ZOMBIE) {
+          if (addr != 0 && copyout(t->pp->pagetable, addr, (char *)&kt->xstate,
+                                   sizeof(kt->xstate)) < 0) {
+            release(&t->lock);
+            release(&kt_wait_lock);
+            return -1;
+          }
+          freekthread(t);
+          release(&t->lock);
+          release(&kt_wait_lock);
+          return 0;
+        }
+        if (t->state == T_UNUSED || t->tid != tid) {
+          release(&t->lock);
+          release(&kt_wait_lock);
+          return -1;
+        }
+        release(&t->lock);
+        sleep(t, &kt_wait_lock);
+      }
+
+      return tid;
+    }
+  }
+
+  release(&kt_wait_lock);
+  return -1;
 }
