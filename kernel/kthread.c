@@ -10,6 +10,7 @@ extern struct proc proc[NPROC];
 
 extern void forkret(void);
 
+struct spinlock kt_wait_lock;
 // Must be called with interrupts disabled,
 // to prevent race with process being moved
 // to a different CPU.
@@ -165,8 +166,37 @@ kthread_create(uint64 start_func, uint64 stack, uint stack_size)
 }
 
 int
+ktkilled(struct kthread *kt)
+{
+  int k;
+
+  acquire(&kt->lock);
+  k = kt->killed;
+  release(&kt->lock);
+
+  return k;
+}
+
+int
 kthread_kill(int tid)
 {
+  struct proc *p;
+  struct kthread *kt;
+
+  p = myproc();
+
+  for(kt = p->kthread; kt < &p->kthread[NKT]; kt++){
+    acquire(&kt->lock);
+    if(kt->tid == tid){
+      kt->killed = 1;
+      if(kt->state == T_SLEEPING)
+        kt->state = T_RUNNABLE;
+      release(&kt->lock);
+      return 0;
+    }
+    release(&kt->lock);
+  }
+
   return -1;
 } 
 
@@ -174,6 +204,36 @@ void
 kthread_exit(int status)
 {
 
+  struct kthread *t;
+  struct kthread *kt = mykthread();
+  struct proc *p = myproc();
+
+  acquire(&kt_wait_lock);
+
+  // Some thread can be waiting on me to exit
+  wakeup(kt);
+
+  acquire(&kt->lock);
+
+  kt->xstate = status;
+  kt->state = T_ZOMBIE;
+
+  release(&kt->lock);
+  release(&kt_wait_lock);
+
+  for(t = p->kthread; t < &p->kthread[NKT]; t++){
+    acquire(&t->lock);
+    if(t->state != T_UNUSED && t->state != T_ZOMBIE){
+      // found another runnable thread
+      release(&t->lock);
+      acquire(&kt->lock);
+      sched();
+      panic("zombie thread exit");
+    }
+    release(&t->lock);
+  }
+
+  exit(status);
 }
 
 int

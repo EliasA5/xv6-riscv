@@ -24,6 +24,7 @@ extern char trampoline[]; // trampoline.S
 // memory model when using p->parent.
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
+extern struct spinlock kt_wait_lock;
 
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
@@ -52,6 +53,7 @@ procinit(void)
   
   initlock(&pid_lock, "nextpid");
   initlock(&wait_lock, "wait_lock");
+  initlock(&kt_wait_lock, "kt_wait_lock");
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
       p->state = UNUSED;
@@ -362,12 +364,14 @@ exit(int status)
   wakeup(p->parent);
   
   acquire(&p->lock);
+  acquire(&kt->lock);
 
   p->xstate = status;
   p->state = ZOMBIE;
   //FIXME
   kt->state = T_ZOMBIE;
-  
+
+  release(&kt->lock);
   release(&p->lock);
   release(&wait_lock);
 

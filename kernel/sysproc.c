@@ -58,7 +58,7 @@ sys_sleep(void)
   acquire(&tickslock);
   ticks0 = ticks;
   while(ticks - ticks0 < n){
-    if(killed(myproc())){
+    if(ktkilled(mykthread())){
       release(&tickslock);
       return -1;
     }
@@ -100,7 +100,7 @@ sys_kthread_create(void)
   argaddr(0, &start_func);
   argaddr(1, &stack);
   argint(2, (int *) &stack_size);
-  if(stack_size > 0)
+  if(stack_size == 0)
     return -1; 
 
   return kthread_create(start_func, stack, (uint) stack_size); 

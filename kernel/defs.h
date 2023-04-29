@@ -119,6 +119,7 @@ int                 kthread_create(uint64 start_func, uint64 stack, uint stack_s
 int                 kthread_kill(int tid);   
 void                kthread_exit(int status);
 int                 kthread_join(int tid, uint64);
+int                 ktkilled(struct kthread *);
 
 // swtch.S
 void            swtch(struct context*, struct context*);
