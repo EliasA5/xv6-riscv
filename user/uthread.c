@@ -10,6 +10,14 @@ static struct uthread dummy[1] = {0};
 void usched(void);
 void usched1(void);
 
+
+int inc_uid()
+{
+    static int uids = 0;
+    uids++;
+    return uids;
+}
+
 int uthread_create(void (*start_func)(), enum sched_priority priority)
 {
    struct uthread *t;
@@ -18,6 +26,7 @@ int uthread_create(void (*start_func)(), enum sched_priority priority)
         if(t->state == FREE){
             found = 0;
             t->priority = priority;
+            t->uid = inc_uid();
             memset(&t->context, 0, sizeof(t->context));
             t->context.ra = (uint64) start_func;
             t->context.sp = (uint64) t->ustack + STACK_SIZE;
@@ -96,7 +105,7 @@ void usched()
         to_run = curr_thread;
     }
     if (found == 0)
-        exit(0);
+        kthread_exit(0);
 
     t = curr_thread;
     curr_thread = to_run;
@@ -120,9 +129,11 @@ void usched1(void)
       curr_thread = t;
   }
   if (found == 0)
-    exit(-1);
+    kthread_exit(-1);
   curr_thread->state = RUNNING;
   uswtch(&dummy->context, &curr_thread->context);
 }
 
-
+int uthread_id(){
+    return curr_thread->uid;
+}
