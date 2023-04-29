@@ -435,8 +435,11 @@ uint64
 sys_exec(void)
 {
   char path[MAXPATH], *argv[MAXARG];
-  int i;
+  int i, old_tid;
   uint64 uargv, uarg;
+  struct kthread *t;
+  struct proc *p = myproc();
+  struct kthread *kt = mykthread();
 
   argaddr(1, &uargv);
   if(argstr(0, path, MAXPATH) < 0) {
@@ -460,6 +463,33 @@ sys_exec(void)
     if(fetchstr(uarg, argv[i], PGSIZE) < 0)
       goto bad;
   }
+
+  acquire(&kt->lock);
+  old_tid = kt->tid;
+  kt->tid = -1;
+  release(&kt->lock);
+
+  for(t = p->kthread; t < &p->kthread[NKT]; t++){
+    if(t == kt)
+      continue;
+    acquire(&t->lock);
+    if(t->state != T_RUNNING){
+      freekthread(t);
+      t->state = T_USED;
+    }
+    else{
+      t->killed = 1;
+      release(&t->lock);
+      kthread_join(t->tid, 0);
+      acquire(&t->lock);
+      t->state = T_USED;
+    }
+    release(&t->lock);
+  }
+
+  acquire(&kt->lock);
+  kt->tid = old_tid;
+  release(&kt->lock);
 
   int ret = exec(path, argv);
 

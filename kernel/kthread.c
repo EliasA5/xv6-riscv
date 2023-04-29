@@ -94,7 +94,6 @@ struct kthread*
 allockthread(struct proc *p)
 {
   struct kthread *t;
-  //FIXME lock p->lock 
   for(t = p->kthread; t < &p->kthread[NKT]; t++) {
     acquire(&t->lock);
     if(t->state == T_UNUSED) {
@@ -165,6 +164,14 @@ kthread_create(uint64 start_func, uint64 stack, uint stack_size)
   return tid;
 }
 
+void
+kt_setkilled(struct kthread *kt)
+{
+  acquire(&kt->lock);
+  kt->killed = 1;
+  release(&kt->lock);
+}
+
 int
 ktkilled(struct kthread *kt)
 {
@@ -182,6 +189,9 @@ kthread_kill(int tid)
 {
   struct proc *p;
   struct kthread *kt;
+
+  if(tid == -1)
+    return -1;
 
   p = myproc();
 
@@ -239,8 +249,42 @@ kthread_exit(int status)
 int
 kthread_join(int tid, uint64 addr)
 {
+  struct kthread *t;
+  struct kthread *kt = mykthread();
+  struct proc *p = myproc();
+
+  acquire(&kt_wait_lock);
+
+  for (t = p->kthread; t < &p->kthread[NKT]; t++) {
+    if (t->tid == tid) {
+
+      for (;;) {
+        acquire(&t->lock);
+        if (t->state == T_ZOMBIE) {
+          if (addr != 0 && copyout(t->pp->pagetable, addr, (char *)&kt->xstate,
+                                   sizeof(kt->xstate)) < 0) {
+            release(&t->lock);
+            release(&kt_wait_lock);
+            return -1;
+          }
+          freekthread(t);
+          release(&t->lock);
+          release(&kt_wait_lock);
+          return 0;
+        }
+        if (t->state == T_UNUSED || t->tid != tid) {
+          release(&t->lock);
+          release(&kt_wait_lock);
+          return -1;
+        }
+        release(&t->lock);
+        sleep(t, &kt_wait_lock);
+      }
+
+      return tid;
+    }
+  }
+
+  release(&kt_wait_lock);
   return -1;
 }
-
-
-

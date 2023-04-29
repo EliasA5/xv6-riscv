@@ -335,11 +335,34 @@ reparent(struct proc *p)
 void
 exit(int status)
 {
+  struct kthread *t;
   struct proc *p = myproc();
   struct kthread *kt = mykthread();
 
   if(p == initproc)
     panic("init exiting");
+
+  acquire(&kt->lock);
+  kt->tid = -1;
+  release(&kt->lock);
+
+  for(t = p->kthread; t < &p->kthread[NKT]; t++){
+    if(t == kt)
+      continue;
+    acquire(&t->lock);
+    if(t->state != T_RUNNING){
+      t->state = T_USED;
+    }
+    else{
+      t->killed = 1;
+      release(&t->lock);
+      kthread_join(t->tid, 0);
+      acquire(&t->lock);
+      t->state = T_USED;
+    }
+    release(&t->lock);
+  }
+
 
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){
@@ -368,7 +391,6 @@ exit(int status)
 
   p->xstate = status;
   p->state = ZOMBIE;
-  //FIXME
   kt->state = T_ZOMBIE;
 
   release(&kt->lock);
@@ -594,7 +616,6 @@ kill(int pid)
 void
 setkilled(struct proc *p)
 {
-  //FIXME
   acquire(&p->lock);
   p->killed = 1;
   release(&p->lock);
