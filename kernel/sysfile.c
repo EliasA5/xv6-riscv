@@ -435,7 +435,7 @@ uint64
 sys_exec(void)
 {
   char path[MAXPATH], *argv[MAXARG];
-  int i, old_tid;
+  int i, old_pid;
   uint64 uargv, uarg;
   struct kthread *t;
   struct proc *p = myproc();
@@ -464,10 +464,15 @@ sys_exec(void)
       goto bad;
   }
 
-  acquire(&kt->lock);
-  old_tid = kt->tid;
-  kt->tid = -1;
-  release(&kt->lock);
+  acquire(&p->lock);
+  if(p->pid == -1){
+    release(&p->lock);
+    kt->killed = 1;
+    goto bad;
+  }
+  old_pid = p->pid;
+  p->pid = -1;
+  release(&p->lock);
 
   for(t = p->kthread; t < &p->kthread[NKT]; t++){
     if(t == kt)
@@ -487,9 +492,14 @@ sys_exec(void)
     release(&t->lock);
   }
 
-  acquire(&kt->lock);
-  kt->tid = old_tid;
-  release(&kt->lock);
+  p->pid = old_pid;
+  p->tid_counter = 2;
+
+  kt->tid = 1;
+
+  for(t = p->kthread; t < &p->kthread[NKT]; t++)
+    if(t != kt)
+      t->state = T_UNUSED;
 
   int ret = exec(path, argv);
 
