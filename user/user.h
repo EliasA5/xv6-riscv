@@ -1,3 +1,4 @@
+#include "kernel/types.h"
 struct stat;
 #define MAX_STACK_SIZE 4000 
 
