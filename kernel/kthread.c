@@ -261,8 +261,8 @@ kthread_join(int tid, uint64 addr)
       for (;;) {
         acquire(&t->lock);
         if (t->state == T_ZOMBIE) {
-          if (addr != 0 && copyout(t->pp->pagetable, addr, (char *)&kt->xstate,
-                                   sizeof(kt->xstate)) < 0) {
+          if (addr != 0 && copyout(kt->pp->pagetable, addr, (char *)&t->xstate,
+                                   sizeof(t->xstate)) < 0) {
             release(&t->lock);
             release(&kt_wait_lock);
             return -1;
