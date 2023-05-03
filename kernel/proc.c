@@ -338,13 +338,19 @@ exit(int status)
   struct kthread *t;
   struct proc *p = myproc();
   struct kthread *kt = mykthread();
+  int old_pid;
 
   if(p == initproc)
     panic("init exiting");
 
-  acquire(&kt->lock);
-  kt->tid = -1;
-  release(&kt->lock);
+  acquire(&p->lock);
+  if(p->pid == -1){
+    release(&p->lock);
+    kthread_exit(-1);
+  }
+  old_pid = p->pid;
+  p->pid = -1;
+  release(&p->lock);
 
   for(t = p->kthread; t < &p->kthread[NKT]; t++){
     if(t == kt)
@@ -363,6 +369,7 @@ exit(int status)
     release(&t->lock);
   }
 
+  p->pid = old_pid;
 
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){
