@@ -134,6 +134,11 @@ UPROGS=\
 	$U/_wc\
 	$U/_zombie\
 	$U/_ukttest\
+	$U/_ktfork\
+	$U/_ktjoin\
+	$U/_ktkill\
+	$U/_ktexec\
+	$U/_ktexit\
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)
