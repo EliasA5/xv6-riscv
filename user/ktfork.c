@@ -12,15 +12,15 @@ void *ktdo(void){
   return 0;
 }
 
-int main(){
- int i;
- for(i = 0; i < NKT; i++){
-   kthread_create(ktdo, malloc(4000), 4000);
- }
- sleep(5);
- printf("parent created NKT=%d threads, trying 1 more\n", NKT-1);
- printf("%s\n", kthread_create(ktdo, malloc(4000), 4000) == 0 ? "FAILURE" : "SUCCESS");
+int main() {
+  int i;
+  for (i = 0; i < NKT - 1; i++) {
+    kthread_create(ktdo, malloc(4000), 4000);
+  }
+  sleep(5);
+  printf("parent created NKT=%d threads, trying 1 more\n", NKT - 1);
+  printf("%s\n", kthread_create(ktdo, malloc(4000), 4000) != -1 ? "FAILURE" : "SUCCESS");
 
+  kthread_exit(0);
   return 0;
 }
-
