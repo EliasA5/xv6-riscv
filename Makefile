@@ -133,7 +133,6 @@ UPROGS=\
 	$U/_grind\
 	$U/_wc\
 	$U/_zombie\
-	$U/_ukttest\
 	$U/_ktfork\
 	$U/_ktjoin\
 	$U/_ktkill\
