@@ -68,6 +68,12 @@ int ustack_free(void)
   head = prev;
   stack_size -= old_size;
 
+  // freed all allocated stacks
+  if(head == base){
+    head = 0;
+    sbrk(-PGSIZE);
+  }
+
   return old_size - sizeof(Header);
 }
 

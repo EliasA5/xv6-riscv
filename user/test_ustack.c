@@ -18,7 +18,7 @@ int main()
     // printf("%s\n", arr[i]);
   }
   // print_stack();
-  for(i = ARRSIZE; i; i--){
+  for(i = ARRSIZE+1; i; i--){
     printf("ustack_free size: %d\n", ustack_free());
   }
 
