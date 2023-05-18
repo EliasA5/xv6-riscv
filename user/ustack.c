@@ -35,9 +35,9 @@ void *ustack_malloc(uint len)
     head = base;
   }
   if((page_diff = PGNUM(stack_size + len)) > PGNUM(stack_size))
-    p = (Header *) sbrk(PGSIZE);
-  else
-    p = ((void *) (head)) + head->size;
+    sbrk(PGSIZE);
+
+  p = ((void *) (head)) + head->size;
 
   p->ptr = head;
   p->size = len;
