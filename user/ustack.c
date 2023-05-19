@@ -7,8 +7,6 @@
 
 // MAXUALLOC = 512
 
-#define PGNUM(sz) ((sz) >> PGSHIFT)
-
 struct header{
   struct header *ptr;
   uint16 size;
@@ -23,7 +21,6 @@ static uint64 stack_size;
 void *ustack_malloc(uint len)
 {
   Header *p;
-  uint page_diff;
   if(len > MAXUALLOC)
     return (void *) -1;
 
@@ -34,7 +31,8 @@ void *ustack_malloc(uint len)
     base->size = stack_size = sizeof(Header);
     head = base;
   }
-  if((page_diff = PGNUM(stack_size + len)) > PGNUM(stack_size))
+  // went up a page
+  if(PGROUNDUP(stack_size) == PGROUNDDOWN(stack_size+len))
     sbrk(PGSIZE);
 
   p = ((void *) (head)) + head->size;
@@ -52,19 +50,14 @@ int ustack_free(void)
 {
   Header *p,*prev;
   uint old_size;
-  uint page_diff;
   if(head == 0 || head == base)
     return -1;
   p = head;
   old_size = p->size;
   prev = p->ptr;
   // went down a page
-  if((page_diff = PGNUM(stack_size - p->size)) < PGNUM(stack_size))
+  if(PGROUNDDOWN(stack_size) == PGROUNDUP(stack_size - old_size))
     sbrk(-PGSIZE); 
-  else if(page_diff > PGNUM(stack_size)){
-    printf("ustack_free underflow\n");
-    return -1;
-  }
   head = prev;
   stack_size -= old_size;
 
