@@ -32,8 +32,9 @@ void *ustack_malloc(uint len)
     head = base;
   }
   // went up a page
-  if(PGROUNDUP(stack_size) == PGROUNDDOWN(stack_size+len))
-    sbrk(PGSIZE);
+  if((PGROUNDUP(stack_size) == PGROUNDDOWN(stack_size+len))
+      && sbrk(PGSIZE) == (char *) -1)
+    return (void *) -1;
 
   p = ((void *) (head)) + head->size;
 
