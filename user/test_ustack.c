@@ -12,14 +12,15 @@ int main()
 
   for(i = 0; i < ARRSIZE; i++){
     arr[i] = ustack_malloc(512-ARRSIZE+1+i);
-    printf("iter %d: loc %d\n", i, arr[i]);
-    for(j = 0; j < 512-ARRSIZE+1; j++)
+    printf("iter %d: loc %d, ", i, arr[i]);
+    for(j = 0; j < ARRSIZE-i; j++)
       arr[i][j] = '0' + i;
-    // printf("%s\n", arr[i]);
+    printf("%s\n", arr[i]);
   }
   // print_stack();
   for(i = ARRSIZE+1; i; i--){
-    printf("ustack_free size: %d\n", ustack_free());
+    printf("ustack_free size: %d\n",
+        ustack_free());
   }
 
   return 0;
