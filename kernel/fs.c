@@ -830,3 +830,24 @@ readFromSwapFile(struct proc * p, char* buffer, uint placeOnFile, uint size)
   p->swapFile->off = placeOnFile;
   return kfileread(p->swapFile, (uint64)buffer,  size);
 }
+
+int
+copySwapFile(struct proc *old, struct proc *new)
+{
+  char *buf;
+  int i;
+
+  if((buf = (char *) kalloc()) == 0)
+    return -1;
+  for(i = 0; i < sizeof(old->swap_metadata)/sizeof(struct swap_metadata); i++){
+    if(old->swap_metadata[i].used == 0)
+      continue;
+    new->swap_metadata[i].used = old->swap_metadata[i].used;
+    readFromSwapFile(old, buf, old->swap_metadata[i].offset, PGSIZE);
+    writeToSwapFile(new, buf, new->swap_metadata[i].offset, PGSIZE);
+  }
+
+  kfree((void *) buf);
+  return 0;
+}
+

@@ -58,6 +58,7 @@ int		        createSwapFile(struct proc* p);
 int	          	readFromSwapFile(struct proc * p, char* buffer, uint placeOnFile, uint size);
 int		        writeToSwapFile(struct proc* p, char* buffer, uint placeOnFile, uint size);
 int		        removeSwapFile(struct proc* p);
+int             copySwapFile(struct proc *old, struct proc *new);
 
 // ramdisk.c
 void            ramdiskinit(void);
