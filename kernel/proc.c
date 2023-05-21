@@ -48,13 +48,16 @@ void
 procinit(void)
 {
   struct proc *p;
-  
+  uint i;
+
   initlock(&pid_lock, "nextpid");
   initlock(&wait_lock, "wait_lock");
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
       p->state = UNUSED;
       p->kstack = KSTACK((int) (p - proc));
+      for(i = 0; i < MAX_TOTAL_PAGES - MAX_PSYC_PAGES; i++)
+        p->swap_metadata[i].offset = i*PGSIZE;
   }
 }
 
@@ -161,6 +164,8 @@ freeproc(struct proc *p)
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
+  proc_freeswapmetadata(p);
+  p->curr_psyc_page = 0;
   p->sz = 0;
   p->pid = 0;
   p->parent = 0;
@@ -213,6 +218,14 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
   uvmfree(pagetable, sz);
+}
+
+void
+proc_freeswapmetadata(struct proc *p)
+{
+  uint i;
+  for(i = 0; i < MAX_TOTAL_PAGES - MAX_PSYC_PAGES; i++)
+    p->swap_metadata[i].used = 0;
 }
 
 // a user program that calls exec("/init")
