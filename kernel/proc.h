@@ -81,6 +81,11 @@ struct trapframe {
 
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
+struct swap_metadata {
+  uint used;
+  uint64 offset;
+};
+
 // Per-process state
 struct proc {
   struct spinlock lock;
@@ -106,4 +111,6 @@ struct proc {
   char name[16];               // Process name (debugging)
 
   struct file *swapFile;
+  uint64 curr_psyc_page;
+  struct swap_metadata swap_metadata[MAX_TOTAL_PAGES - MAX_PSYC_PAGES];
 };
