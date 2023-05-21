@@ -318,6 +318,23 @@ fork(void)
   np->parent = p;
   release(&wait_lock);
 
+  // Allocate a swap file
+  if(createSwapFile(np) != 0){
+    acquire(&np->lock);
+    freeproc(np);
+    release(&np->lock);
+    return 0;
+  }
+
+  // Copy parent swapfile into np swapfile
+  if(p->swapFile && copySwapFile(p, np) != 0){
+      removeSwapFile(np);
+      acquire(&np->lock);
+      freeproc(np);
+      release(&np->lock);
+      return 0;
+  }
+
   acquire(&np->lock);
   np->state = RUNNABLE;
   release(&np->lock);
@@ -359,6 +376,10 @@ exit(int status)
       p->ofile[fd] = 0;
     }
   }
+
+  // remove swap file, the function checks if the swap file exists
+  removeSwapFile(p);
+  p->swapFile = 0;
 
   begin_op();
   iput(p->cwd);
