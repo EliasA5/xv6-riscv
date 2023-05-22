@@ -97,6 +97,7 @@ pagetable_t     proc_pagetable(struct proc *);
 void            proc_freepagetable(pagetable_t, uint64);
 int             remove_swap_page(struct proc *p, pagetable_t pagetable, uint64 idx);
 void            proc_freeswapmetadata(struct proc *p);
+int             handle_page_fault(struct proc *p, uint64 va);
 int             kill(int);
 int             killed(struct proc*);
 void            setkilled(struct proc*);

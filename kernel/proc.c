@@ -278,9 +278,35 @@ swap_out_pages(struct proc *p, uint64 va, uint npages)
       panic("swap_out: not a leaf");
     if((*pte & PTE_U) == 0)
       panic("swap_out: trying to swap out non-user page");
-    add_swap_page(p, pte);
+    if(add_swap_page(p, pte) != 0)
+      panic("swap_out: couldn't swap pages");
   }
 
+}
+
+
+static int
+swap_between_pages(struct proc *p, pte_t *pte_psyc, pte_t *pte_swap)
+{
+  char *mem;
+
+  if((mem = (char *) kalloc()) == 0)
+    return -1;
+  if((readFromSwapFile(p, mem, p->swap_metadata[*pte_swap >> 12].offset, PGSIZE)) == -1){
+    printf("swap_between_pages: failed to read from swp file\n");
+    kfree(mem);
+    return -1;
+  }
+  p->swap_metadata[*pte_swap >> 12].used = 0;
+  *pte_swap = PA2PTE((uint64) mem) | PTE_FLAGS(*pte_swap);
+  *pte_swap &= ~(PTE_PG | PTE_A);
+  *pte_swap |= PTE_V;
+  if(add_swap_page(p, pte_psyc) != 0){
+    panic("swap_between_pages: couldn't swap out psyc page");
+    return -1;
+  }
+
+  return 0;
 }
 
 // a user program that calls exec("/init")
@@ -340,8 +366,10 @@ growproc(int n)
     sz = uvmdealloc(p->pagetable, sz, sz + n);
   }
   p->sz = sz;
-  if(PGROUNDUP(p->sz)/PGSIZE > MAX_TOTAL_PAGES)
+  if(PGROUNDUP(p->sz)/PGSIZE > MAX_TOTAL_PAGES){
+    printf("pid %d exceeded maximum allowed pages, got %d\n", p->pid, PGROUNDUP(p->sz)/PGSIZE);
     exit(-1);
+  }
   if(p->swapFile && PGROUNDUP(p->sz)/PGSIZE > MAX_PSYC_PAGES && p->sz > old_sz){
     if(PGROUNDUP(old_sz)/PGSIZE > MAX_PSYC_PAGES){
       npages = (PGROUNDUP(p->sz) - PGROUNDUP(old_sz)) / PGSIZE;
@@ -351,6 +379,43 @@ growproc(int n)
       start_addr = MAX_PSYC_PAGES * PGSIZE;
     }
     swap_out_pages(p, start_addr, npages);
+  }
+
+  return 0;
+}
+
+// SCFIFO
+int
+handle_page_fault(struct proc *p, uint64 va)
+{
+  pte_t *pte, *pte_psyc;
+  if((pte = walk(p->pagetable, va, 0)) == 0)
+    return -1;
+  if((*pte & PTE_PG) == 0){
+    printf("handle_page_fault: pte not paged %x\n", *pte);
+    return -1;
+  }
+
+  for(;; p->curr_psyc_page += PGSIZE){
+    if(p->curr_psyc_page > p->sz)
+      p->curr_psyc_page = 0;
+    if((pte_psyc = walk(p->pagetable, p->curr_psyc_page, 0)) == 0)
+      continue;
+    if((*pte_psyc & PTE_V) == 0)
+      continue;
+    if((*pte_psyc & PTE_U) == 0)
+      continue;
+    if((*pte_psyc & PTE_A) != 0){
+      *pte_psyc &= ~PTE_A;
+      continue;
+    }
+    // printf("name: %s, PGFAULT: va %p, curr_psy_va %p, curr_psy_pte %p\n",
+    //         p->name, va, p->curr_psyc_page, *pte_psyc);
+    if(swap_between_pages(p, pte_psyc, pte) != 0){
+      printf("PGFAULT: couln't swap\n");
+      continue;
+    }
+    break;
   }
 
   return 0;
