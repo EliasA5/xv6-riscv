@@ -389,6 +389,8 @@ int
 handle_page_fault(struct proc *p, uint64 va)
 {
   pte_t *pte, *pte_psyc;
+  if(va >= MAXVA)
+    return -1;
   if((pte = walk(p->pagetable, va, 0)) == 0)
     return -1;
   if((*pte & PTE_PG) == 0){
