@@ -95,6 +95,7 @@ int             growproc(int);
 void            proc_mapstacks(pagetable_t);
 pagetable_t     proc_pagetable(struct proc *);
 void            proc_freepagetable(pagetable_t, uint64);
+int             remove_swap_page(struct proc *p, pagetable_t pagetable, uint64 idx);
 void            proc_freeswapmetadata(struct proc *p);
 int             kill(int);
 int             killed(struct proc*);

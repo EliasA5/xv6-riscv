@@ -228,6 +228,61 @@ proc_freeswapmetadata(struct proc *p)
     p->swap_metadata[i].used = 0;
 }
 
+int
+remove_swap_page(struct proc *p, pagetable_t pagetable, uint64 idx)
+{
+  // printf("rm_swp_page: idx %d, used %d\n", idx, p->swap_metadata[idx].used);
+  if(p->pagetable == pagetable && p->swap_metadata[idx].used){
+    p->swap_metadata[idx].used = 0;
+    return 0;
+  }
+  return -1;
+}
+
+static int
+add_swap_page(struct proc *p, pte_t *pte)
+{
+  uint i;
+  if(p->swapFile == 0)
+    return -1;
+  for(i = 0; i < MAX_TOTAL_PAGES - MAX_PSYC_PAGES; i++){
+    if(p->swap_metadata[i].used == 0){
+      p->swap_metadata[i].used = 1;
+      writeToSwapFile(p, (char *) PTE2PA(*pte), p->swap_metadata[i].offset, PGSIZE);
+      kfree((void *) PTE2PA(*pte));
+      *pte = (i << PGSHIFT) | PTE_FLAGS(*pte);
+      *pte &= ~PTE_V;
+      *pte |= PTE_PG;
+      // printf("add_swp_page: i %d, pte %x, used %d\n", *pte >> PGSHIFT, *pte, p->swap_metadata[i].used);
+      return 0;
+    }
+  }
+  return -1;
+}
+
+static void
+swap_out_pages(struct proc *p, uint64 va, uint npages)
+{
+  uint64 i, a;
+  pte_t *pte;
+
+  for(a = va, i = npages; i > 0; a += PGSIZE, i--){
+    if((pte = walk(p->pagetable, a, 0)) == 0)
+      panic("swap_out_pages: walk");
+
+    if((*pte & PTE_V) == 0 && (*pte & PTE_PG) != 0)
+      panic("swap_out: already swapped");
+    if((*pte & PTE_V) == 0)
+      panic("swap_out: not mapped");
+    if(PTE_FLAGS(*pte) == PTE_V)
+      panic("swap_out: not a leaf");
+    if((*pte & PTE_U) == 0)
+      panic("swap_out: trying to swap out non-user page");
+    add_swap_page(p, pte);
+  }
+
+}
+
 // a user program that calls exec("/init")
 // assembled from ../user/initcode.S
 // od -t xC ../user/initcode
@@ -272,10 +327,11 @@ userinit(void)
 int
 growproc(int n)
 {
-  uint64 sz;
+  uint64 sz, old_sz, start_addr;
+  uint npages;
   struct proc *p = myproc();
 
-  sz = p->sz;
+  sz = old_sz = p->sz;
   if(n > 0){
     if((sz = uvmalloc(p->pagetable, sz, sz + n, PTE_W)) == 0) {
       return -1;
@@ -284,6 +340,19 @@ growproc(int n)
     sz = uvmdealloc(p->pagetable, sz, sz + n);
   }
   p->sz = sz;
+  if(PGROUNDUP(p->sz)/PGSIZE > MAX_TOTAL_PAGES)
+    exit(-1);
+  if(p->swapFile && PGROUNDUP(p->sz)/PGSIZE > MAX_PSYC_PAGES && p->sz > old_sz){
+    if(PGROUNDUP(old_sz)/PGSIZE > MAX_PSYC_PAGES){
+      npages = (PGROUNDUP(p->sz) - PGROUNDUP(old_sz)) / PGSIZE;
+      start_addr = PGROUNDUP(old_sz);
+    } else {
+      npages = PGROUNDUP(p->sz)/PGSIZE - MAX_PSYC_PAGES;
+      start_addr = MAX_PSYC_PAGES * PGSIZE;
+    }
+    swap_out_pages(p, start_addr, npages);
+  }
+
   return 0;
 }
 
@@ -332,7 +401,7 @@ fork(void)
   release(&wait_lock);
 
   // Allocate a swap file
-  if(createSwapFile(np) != 0){
+  if(strncmp(p->name, "init", 5) != 0 && strncmp(p->name, "sh", 3) != 0 && createSwapFile(np) != 0){
     acquire(&np->lock);
     freeproc(np);
     release(&np->lock);
@@ -340,7 +409,7 @@ fork(void)
   }
 
   // Copy parent swapfile into np swapfile
-  if(p->swapFile && copySwapFile(p, np) != 0){
+  if(p->swapFile && np->swapFile && copySwapFile(p, np) != 0){
       removeSwapFile(np);
       acquire(&np->lock);
       freeproc(np);
