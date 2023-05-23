@@ -246,16 +246,16 @@ add_swap_page(struct proc *p, pte_t *pte)
   if(p->swapFile == 0)
     return -1;
   for(i = 0; i < MAX_TOTAL_PAGES - MAX_PSYC_PAGES; i++){
-    if(p->swap_metadata[i].used == 0){
-      p->swap_metadata[i].used = 1;
-      writeToSwapFile(p, (char *) PTE2PA(*pte), p->swap_metadata[i].offset, PGSIZE);
-      kfree((void *) PTE2PA(*pte));
-      *pte = (i << PGSHIFT) | PTE_FLAGS(*pte);
-      *pte &= ~PTE_V;
-      *pte |= PTE_PG;
-      // printf("add_swp_page: i %d, pte %x, used %d\n", *pte >> PGSHIFT, *pte, p->swap_metadata[i].used);
-      return 0;
-    }
+    if(p->swap_metadata[i].used != 0)
+      continue;
+    p->swap_metadata[i].used = 1;
+    writeToSwapFile(p, (char *) PTE2PA(*pte), p->swap_metadata[i].offset, PGSIZE);
+    kfree((void *) PTE2PA(*pte));
+    *pte = (i << PGSHIFT) | PTE_FLAGS(*pte);
+    *pte &= ~PTE_V;
+    *pte |= PTE_PG;
+    // printf("add_swp_page: i %d, pte %x, used %d\n", *pte >> PGSHIFT, *pte, p->swap_metadata[i].used);
+    return 0;
   }
   return -1;
 }
