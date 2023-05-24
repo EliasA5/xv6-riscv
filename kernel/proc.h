@@ -86,6 +86,16 @@ struct swap_metadata {
   uint64 offset;
 };
 
+#if SWAP_ALGO == NFUA
+struct nfua_counter {
+  uint32 value;
+};
+#elif SWAP_ALGO == LAPA
+struct lapa_counter {
+  uint32 value;
+};
+#endif
+
 // Per-process state
 struct proc {
   struct spinlock lock;
@@ -111,6 +121,13 @@ struct proc {
   char name[16];               // Process name (debugging)
 
   struct file *swapFile;
-  uint64 curr_psyc_page;
   struct swap_metadata swap_metadata[MAX_TOTAL_PAGES - MAX_PSYC_PAGES];
+
+#if SWAP_ALGO == NFUA
+  struct nfua_counter nfua_counters[MAX_TOTAL_PAGES];
+#elif SWAP_ALGO == LAPA
+  struct lapa_counter lapa_counters[MAX_TOTAL_PAGES];
+#elif SWAP_ALGO == SCFIFO
+  uint64 curr_psyc_page;
+#endif
 };

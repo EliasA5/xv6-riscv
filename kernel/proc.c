@@ -158,6 +158,7 @@ found:
 static void
 freeproc(struct proc *p)
 {
+  uint i;
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
@@ -165,7 +166,15 @@ freeproc(struct proc *p)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
   proc_freeswapmetadata(p);
+#if SWAP_ALGO == SCFIFO
   p->curr_psyc_page = 0;
+#elif SWAP_ALGO == NFUA
+  for(i = 0; i < MAX_TOTAL_PAGES; i++)
+    p->nfua_counters[i].value = 0;
+#elif SWAP_ALGO == LAPA
+  for(i = 0; i < MAX_TOTAL_PAGES; i++)
+    p->lapa_counters[i].value |= ~p->lapa_counters[i].value;
+#endif
   p->sz = 0;
   p->pid = 0;
   p->parent = 0;
@@ -286,7 +295,7 @@ swap_out_pages(struct proc *p, uint64 va, uint npages)
 
 
 static int
-swap_between_pages(struct proc *p, pte_t *pte_psyc, pte_t *pte_swap)
+swap_between_pages(struct proc *p, pte_t *pte_psyc, pte_t *pte_swap, uint64 va)
 {
   char *mem;
 
@@ -301,6 +310,11 @@ swap_between_pages(struct proc *p, pte_t *pte_psyc, pte_t *pte_swap)
   *pte_swap = PA2PTE((uint64) mem) | PTE_FLAGS(*pte_swap);
   *pte_swap &= ~(PTE_PG | PTE_A);
   *pte_swap |= PTE_V;
+#if SWAP_ALGO == NFUA
+    p->nfua_counters[PGROUNDDOWN(va)/PGSIZE].value = 0;
+#elif SWAP_ALGO == LAPA
+    p->lapa_counters[PGROUNDDOWN(va)/PGSIZE].value |= ~p->lapa_counters[PGROUNDDOWN(va)/PGSIZE].value;
+#endif
   if(add_swap_page(p, pte_psyc) != 0){
     panic("swap_between_pages: couldn't swap out psyc page");
     return -1;
@@ -390,7 +404,8 @@ growproc(int n)
 }
 
 #if SWAP_ALGO == SCFIFO
-pte_t *scfifo(struct proc *p)
+static pte_t *
+scfifo(struct proc *p)
 {
   pte_t *pte_psyc;
   for(;; p->curr_psyc_page += PGSIZE){
@@ -415,18 +430,111 @@ pte_t *scfifo(struct proc *p)
 #endif
 
 #if (SWAP_ALGO == NFUA)
-pte_t *nfua(struct proc *p)
+static void
+nfua_tick(struct proc *p)
 {
-  pte_t *pte_psyc = 0;
+  pte_t *pte_psyc;
+  uint i;
+  for(i = 0; i < PGROUNDUP(p->sz)/PGSIZE; i++){
+    if((pte_psyc = walk(p->pagetable, i*PGSIZE, 0)) == 0)
+      continue;
+    if((*pte_psyc & PTE_V) == 0)
+      continue;
+    if((*pte_psyc & PTE_U) == 0)
+      continue;
+    p->nfua_counters[i].value >>= 1;
+    if((*pte_psyc & PTE_A) != 0)
+      p->nfua_counters[i].value |= 1 << (sizeof(p->nfua_counters[i].value)*8-1);
+  }
+}
+
+static pte_t *
+nfua(struct proc *p)
+{
+  pte_t *pte_psyc;
+  uint i;
+  uint min_idx = 0, found;
+  nfua_tick(p);
+  for(i = 0; i < PGROUNDUP(p->sz)/PGSIZE; i++){
+    if((pte_psyc = walk(p->pagetable, i*PGSIZE, 0)) == 0)
+      continue;
+    if((*pte_psyc & PTE_V) == 0)
+      continue;
+    if((*pte_psyc & PTE_U) == 0)
+      continue;
+    if(found == 0){
+      found = 1;
+      min_idx = i;
+      continue;
+    }
+    else if(p->nfua_counters[i].value < p->nfua_counters[min_idx].value)
+      min_idx = i;
+  }
+
+  pte_psyc = walk(p->pagetable, min_idx*PGSIZE, 0);
 
   return pte_psyc;
 }
 #endif
 
 #if SWAP_ALGO == LAPA
-pte_t *lapa(struct proc *p)
+
+static uint
+popcount(uint32 a)
 {
-  pte_t *pte_psyc = 0;
+  uint i = 0;
+  while (a){
+    i = a & 1 ? i+1 : i;
+    a >>= 1; 
+  }
+  return i;
+}
+
+static void
+lapa_tick(struct proc *p)
+{
+pte_t *pte_psyc;
+  uint i;
+  for(i = 0; i < PGROUNDUP(p->sz)/PGSIZE; i++){
+    if((pte_psyc = walk(p->pagetable, i*PGSIZE, 0)) == 0)
+      continue;
+    if((*pte_psyc & PTE_V) == 0)
+      continue;
+    if((*pte_psyc & PTE_U) == 0)
+      continue;
+    p->lapa_counters[i].value >>= 1;
+    if((*pte_psyc & PTE_A) != 0)
+      p->lapa_counters[i].value |= 1 << (sizeof(p->lapa_counters[i].value)*8-1);
+  }
+}
+
+static pte_t *
+lapa(struct proc *p)
+{
+  pte_t *pte_psyc;
+  uint i;
+  uint min_idx = 0, found;
+  uint pop1, pop2;
+  lapa_tick(p);
+  for(i = 0; i < PGROUNDUP(p->sz)/PGSIZE; i++){
+    if((pte_psyc = walk(p->pagetable, i*PGSIZE, 0)) == 0)
+      continue;
+    if((*pte_psyc & PTE_V) == 0)
+      continue;
+    if((*pte_psyc & PTE_U) == 0)
+      continue;
+    if(found == 0){
+      found = 1;
+      min_idx = i;
+      continue;
+    }
+    else if((pop1 = popcount(p->lapa_counters[i].value)) < (pop2 = popcount(p->lapa_counters[min_idx].value)))
+      min_idx = i;
+    else if(pop1 == pop2 && p->lapa_counters[i].value < p->lapa_counters[min_idx].value)
+      min_idx = i;
+  }
+
+  pte_psyc = walk(p->pagetable, min_idx*PGSIZE, 0);
 
   return pte_psyc;
 }
@@ -457,7 +565,7 @@ handle_page_fault(struct proc *p, uint64 va)
 #error no SWAP_ALGO chosen
 #endif
 
-  if(swap_between_pages(p, pte_psyc, pte) != 0)
+  if(swap_between_pages(p, pte_psyc, pte, va) != 0)
     panic("PGFAULT: couln't swap\n");
 
   return 0;
