@@ -292,7 +292,7 @@ swap_between_pages(struct proc *p, pte_t *pte_psyc, pte_t *pte_swap)
 
   if((mem = (char *) kalloc()) == 0)
     return -1;
-  if((readFromSwapFile(p, mem, p->swap_metadata[*pte_swap >> 12].offset, PGSIZE)) == -1){
+  if((readFromSwapFile(p, mem, p->swap_metadata[*pte_swap >> PGSHIFT].offset, PGSIZE)) == -1){
     printf("swap_between_pages: failed to read from swp file\n");
     kfree(mem);
     return -1;
