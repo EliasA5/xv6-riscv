@@ -353,8 +353,11 @@ userinit(void)
 int
 growproc(int n)
 {
-  uint64 sz, old_sz, start_addr;
+  uint64 sz, old_sz;
+#if SWAP_ALGO != NONE
+  uint64 start_addr;
   uint npages;
+#endif
   struct proc *p = myproc();
 
   sz = old_sz = p->sz;
@@ -366,6 +369,7 @@ growproc(int n)
     sz = uvmdealloc(p->pagetable, sz, sz + n);
   }
   p->sz = sz;
+#if SWAP_ALGO != NONE
   if(PGROUNDUP(p->sz)/PGSIZE > MAX_TOTAL_PAGES){
     printf("pid %d exceeded maximum allowed pages, got %d\n", p->pid, PGROUNDUP(p->sz)/PGSIZE);
     exit(-1);
@@ -380,24 +384,15 @@ growproc(int n)
     }
     swap_out_pages(p, start_addr, npages);
   }
+#endif
 
   return 0;
 }
 
-// SCFIFO
-int
-handle_page_fault(struct proc *p, uint64 va)
+#if SWAP_ALGO == SCFIFO
+pte_t *scfifo(struct proc *p)
 {
-  pte_t *pte, *pte_psyc;
-  if(va >= MAXVA)
-    return -1;
-  if((pte = walk(p->pagetable, va, 0)) == 0)
-    return -1;
-  if((*pte & PTE_PG) == 0){
-    printf("handle_page_fault: pte not paged %x\n", *pte);
-    return -1;
-  }
-
+  pte_t *pte_psyc;
   for(;; p->curr_psyc_page += PGSIZE){
     if(p->curr_psyc_page > p->sz)
       p->curr_psyc_page = 0;
@@ -413,12 +408,57 @@ handle_page_fault(struct proc *p, uint64 va)
     }
     // printf("name: %s, PGFAULT: va %p, curr_psy_va %p, curr_psy_pte %p\n",
     //         p->name, va, p->curr_psyc_page, *pte_psyc);
-    if(swap_between_pages(p, pte_psyc, pte) != 0){
-      printf("PGFAULT: couln't swap\n");
-      continue;
-    }
     break;
   }
+  return pte_psyc;
+}
+#endif
+
+#if (SWAP_ALGO == NFUA)
+pte_t *nfua(struct proc *p)
+{
+  pte_t *pte_psyc = 0;
+
+  return pte_psyc;
+}
+#endif
+
+#if SWAP_ALGO == LAPA
+pte_t *lapa(struct proc *p)
+{
+  pte_t *pte_psyc = 0;
+
+  return pte_psyc;
+}
+#endif
+
+int
+handle_page_fault(struct proc *p, uint64 va)
+{
+  pte_t *pte, *pte_psyc;
+#if SWAP_ALGO == NONE
+  return -1;
+#endif
+  if(va >= MAXVA)
+    return -1;
+  if((pte = walk(p->pagetable, va, 0)) == 0)
+    return -1;
+  if((*pte & PTE_PG) == 0){
+    printf("handle_page_fault: pte not paged 0x%x\n", *pte);
+    return -1;
+  }
+#if SWAP_ALGO == SCFIFO
+  pte_psyc = scfifo(p);
+#elif SWAP_ALGO == NFUA
+  pte_psyc = nfua(p);
+#elif SWAP_ALGO == LAPA
+  pte_psyc = lapa(p);
+#else
+#error no SWAP_ALGO chosen
+#endif
+
+  if(swap_between_pages(p, pte_psyc, pte) != 0)
+    panic("PGFAULT: couln't swap\n");
 
   return 0;
 }

@@ -48,6 +48,17 @@ TOOLPREFIX := $(shell if riscv64-unknown-elf-objdump -i 2>&1 | grep 'elf64-big' 
 	echo "***" 1>&2; exit 1; fi)
 endif
 
+# swap algorithm definitions
+# SCFIFO: second chance FIFO, LAPA: least accessed page + aging
+# NFUA: not frequently used + aging
+NFUA = 1
+LAPA = 2
+SCFIFO = 3
+NONE = 4
+ifndef SWAP_ALGO
+SWAP_ALGO := SCFIFO
+endif
+
 QEMU = qemu-system-riscv64
 
 CC = $(TOOLPREFIX)gcc
@@ -62,6 +73,8 @@ CFLAGS += -mcmodel=medany
 CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
 CFLAGS += -I.
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
+CFLAGS += -DSWAP_ALGO=$(SWAP_ALGO)
+CFLAGS += -DNFUA=$(NFUA) -DLAPA=$(LAPA) -DSCFIFO=$(SCFIFO) -DNONE=$(NONE)
 
 # Disable PIE when possible (for Ubuntu 16.10 toolchain)
 ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]no-pie'),)
