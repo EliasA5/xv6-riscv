@@ -452,7 +452,7 @@ nfua(struct proc *p)
 {
   pte_t *pte_psyc;
   uint i;
-  uint min_idx = 0, found;
+  uint min_idx = 0, found = 0;
   nfua_tick(p);
   for(i = 0; i < PGROUNDUP(p->sz)/PGSIZE; i++){
     if((pte_psyc = walk(p->pagetable, i*PGSIZE, 0)) == 0)
@@ -464,13 +464,14 @@ nfua(struct proc *p)
     if(found == 0){
       found = 1;
       min_idx = i;
-      continue;
     }
-    else if(p->nfua_counters[i].value < p->nfua_counters[min_idx].value)
+    // printf("nfua: i %d, pte_psyc %p, counter %d\n", i, *pte_psyc, p->nfua_counters[i].value);
+    if(p->nfua_counters[i].value < p->nfua_counters[min_idx].value)
       min_idx = i;
   }
 
   pte_psyc = walk(p->pagetable, min_idx*PGSIZE, 0);
+  // printf("nfua_chosen: i %d, pte_psyc %p, counter %d\n", min_idx, *pte_psyc, p->nfua_counters[min_idx].value);
 
   return pte_psyc;
 }
@@ -514,7 +515,7 @@ lapa(struct proc *p)
 {
   pte_t *pte_psyc;
   uint i;
-  uint min_idx = 0, found;
+  uint min_idx = 0, found = 0;
   uint pop1, pop2;
   lapa_tick(p);
   for(i = 0; i < PGROUNDUP(p->sz)/PGSIZE; i++){
@@ -536,6 +537,7 @@ lapa(struct proc *p)
   }
 
   pte_psyc = walk(p->pagetable, min_idx*PGSIZE, 0);
+  // printf("lapa_chosen: i %d, pte_psyc %p, counter %d\n", min_idx, *pte_psyc, p->lapa_counters[min_idx].value);
 
   return pte_psyc;
 }
@@ -807,6 +809,11 @@ sched(void)
   int intena;
   struct proc *p = myproc();
 
+#if SWAP_ALGO == NFUA
+  nfua_tick(p);
+#elif SWAP_ALGO == LAPA
+  lapa_tick(p);
+#endif
   if(!holding(&p->lock))
     panic("sched p->lock");
   if(mycpu()->noff != 1)
