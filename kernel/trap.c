@@ -65,7 +65,7 @@ usertrap(void)
     intr_on();
 
     syscall();
-  } else if (r_scause() == 13 || r_scause() == 15){
+  } else if (r_scause() == 13 || r_scause() == 15 || r_scause() == 12){
     if(handle_page_fault(p, r_stval()) != 0){
       printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
       printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());

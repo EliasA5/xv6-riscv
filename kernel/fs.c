@@ -696,7 +696,7 @@ nameiparent(char *path, char *name)
   return namex(path, 1, name);
 }
 
-
+#if SWAP_ALGO != NONE
 #include "fcntl.h"
 #define DIGITS 14
 
@@ -850,4 +850,5 @@ copySwapFile(struct proc *old, struct proc *new)
   kfree((void *) buf);
   return 0;
 }
+#endif
 

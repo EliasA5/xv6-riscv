@@ -119,9 +119,12 @@ exec(char *path, char **argv)
     if(*s == '/')
       last = s+1;
   safestrcpy(p->name, last, sizeof(p->name));
+#if SWAP_ALGO != NONE
   if(strncmp(p->name, "init", 5) != 0 && strncmp(p->name, "sh", 3) != 0 && p->swapFile == 0){
     createSwapFile(p);
   }
+#endif
+
   // Commit to the user image.
   oldpagetable = p->pagetable;
   p->pagetable = pagetable;
@@ -130,6 +133,16 @@ exec(char *path, char **argv)
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
   proc_freeswapmetadata(p);
+
+#if SWAP_ALGO == SCFIFO
+  p->curr_psyc_page = 0;
+#elif SWAP_ALGO == NFUA
+  for(i = 0; i < MAX_TOTAL_PAGES; i++)
+    p->nfua_counters[i].value = 0;
+#elif SWAP_ALGO == LAPA
+  for(i = 0; i < MAX_TOTAL_PAGES; i++)
+    p->lapa_counters[i].value |= ~p->lapa_counters[i].value;
+#endif
 
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 

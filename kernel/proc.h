@@ -120,9 +120,10 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
 
+  #if SWAP_ALGO != NONE
   struct file *swapFile;
   struct swap_metadata swap_metadata[MAX_TOTAL_PAGES - MAX_PSYC_PAGES];
-
+  #endif
 #if SWAP_ALGO == NFUA
   struct nfua_counter nfua_counters[MAX_TOTAL_PAGES];
 #elif SWAP_ALGO == LAPA

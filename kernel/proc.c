@@ -48,7 +48,6 @@ void
 procinit(void)
 {
   struct proc *p;
-  uint i;
 
   initlock(&pid_lock, "nextpid");
   initlock(&wait_lock, "wait_lock");
@@ -56,8 +55,10 @@ procinit(void)
       initlock(&p->lock, "proc");
       p->state = UNUSED;
       p->kstack = KSTACK((int) (p - proc));
-      for(i = 0; i < MAX_TOTAL_PAGES - MAX_PSYC_PAGES; i++)
+      #if SWAP_ALGO != NONE
+      for(uint i = 0; i < MAX_TOTAL_PAGES - MAX_PSYC_PAGES; i++)
         p->swap_metadata[i].offset = i*PGSIZE;
+      #endif
   }
 }
 
@@ -158,7 +159,6 @@ found:
 static void
 freeproc(struct proc *p)
 {
-  uint i;
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
@@ -166,15 +166,6 @@ freeproc(struct proc *p)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
   proc_freeswapmetadata(p);
-#if SWAP_ALGO == SCFIFO
-  p->curr_psyc_page = 0;
-#elif SWAP_ALGO == NFUA
-  for(i = 0; i < MAX_TOTAL_PAGES; i++)
-    p->nfua_counters[i].value = 0;
-#elif SWAP_ALGO == LAPA
-  for(i = 0; i < MAX_TOTAL_PAGES; i++)
-    p->lapa_counters[i].value |= ~p->lapa_counters[i].value;
-#endif
   p->sz = 0;
   p->pid = 0;
   p->parent = 0;
@@ -232,22 +223,27 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 void
 proc_freeswapmetadata(struct proc *p)
 {
+  #if SWAP_ALGO != NONE
   uint i;
   for(i = 0; i < MAX_TOTAL_PAGES - MAX_PSYC_PAGES; i++)
     p->swap_metadata[i].used = 0;
+  #endif
 }
 
 int
 remove_swap_page(struct proc *p, pagetable_t pagetable, uint64 idx)
 {
+#if SWAP_ALGO != NONE
   // printf("rm_swp_page: idx %d, used %d\n", idx, p->swap_metadata[idx].used);
   if(p->pagetable == pagetable && p->swap_metadata[idx].used){
     p->swap_metadata[idx].used = 0;
     return 0;
   }
+#endif
   return -1;
 }
 
+#if SWAP_ALGO != NONE
 static int
 add_swap_page(struct proc *p, pte_t *pte)
 {
@@ -322,6 +318,7 @@ swap_between_pages(struct proc *p, pte_t *pte_psyc, pte_t *pte_swap, uint64 va)
 
   return 0;
 }
+#endif
 
 // a user program that calls exec("/init")
 // assembled from ../user/initcode.S
@@ -443,8 +440,10 @@ nfua_tick(struct proc *p)
     if((*pte_psyc & PTE_U) == 0)
       continue;
     p->nfua_counters[i].value >>= 1;
-    if((*pte_psyc & PTE_A) != 0)
+    if((*pte_psyc & PTE_A) != 0){
       p->nfua_counters[i].value |= 1 << (sizeof(p->nfua_counters[i].value)*8-1);
+      *pte_psyc &= ~PTE_A;
+    }
   }
 }
 
@@ -484,7 +483,7 @@ popcount(uint32 a)
 {
   uint i = 0;
   while (a){
-    i = a & 1 ? i+1 : i;
+    i += a & 1;
     a >>= 1; 
   }
   return i;
@@ -503,8 +502,10 @@ pte_t *pte_psyc;
     if((*pte_psyc & PTE_U) == 0)
       continue;
     p->lapa_counters[i].value >>= 1;
-    if((*pte_psyc & PTE_A) != 0)
+    if((*pte_psyc & PTE_A) != 0){
       p->lapa_counters[i].value |= 1 << (sizeof(p->lapa_counters[i].value)*8-1);
+      *pte_psyc &= ~PTE_A;
+    }
   }
 }
 
@@ -542,11 +543,13 @@ lapa(struct proc *p)
 
 int
 handle_page_fault(struct proc *p, uint64 va)
+#if SWAP_ALGO == NONE
+{
+  return -1;
+}
+#else 
 {
   pte_t *pte, *pte_psyc;
-#if SWAP_ALGO == NONE
-  return -1;
-#endif
   if(va >= MAXVA)
     return -1;
   if((pte = walk(p->pagetable, va, 0)) == 0)
@@ -561,15 +564,13 @@ handle_page_fault(struct proc *p, uint64 va)
   pte_psyc = nfua(p);
 #elif SWAP_ALGO == LAPA
   pte_psyc = lapa(p);
-#else
-#error no SWAP_ALGO chosen
 #endif
-
   if(swap_between_pages(p, pte_psyc, pte, va) != 0)
     panic("PGFAULT: couln't swap\n");
 
   return 0;
 }
+#endif
 
 // Create a new process, copying the parent.
 // Sets up child kernel stack to return as if from fork() system call.
@@ -615,6 +616,7 @@ fork(void)
   np->parent = p;
   release(&wait_lock);
 
+#if SWAP_ALGO != NONE
   // Allocate a swap file
   if(strncmp(p->name, "init", 5) != 0 && strncmp(p->name, "sh", 3) != 0 && createSwapFile(np) != 0){
     acquire(&np->lock);
@@ -631,6 +633,7 @@ fork(void)
       release(&np->lock);
       return 0;
   }
+#endif
 
   acquire(&np->lock);
   np->state = RUNNABLE;
@@ -674,9 +677,11 @@ exit(int status)
     }
   }
 
+#if SWAP_ALGO != NONE
   // remove swap file, the function checks if the swap file exists
   removeSwapFile(p);
   p->swapFile = 0;
+#endif
 
   begin_op();
   iput(p->cwd);
