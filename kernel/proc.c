@@ -483,10 +483,7 @@ static uint
 popcount(uint32 a)
 {
   uint i = 0;
-  while (a){
-    i += a & 1;
-    a >>= 1; 
-  }
+  for(; a; i += a & 1, a >>= 1);
   return i;
 }
 
