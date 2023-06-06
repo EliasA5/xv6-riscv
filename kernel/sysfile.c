@@ -503,3 +503,20 @@ sys_pipe(void)
   }
   return 0;
 }
+
+uint64
+sys_seek(void)
+{
+  struct file *f;
+  int offset, whence;
+
+  
+  argint(1, &offset);
+  argint(2, &whence);
+  if(whence != SEEK_CUR && whence != SEEK_SET)
+    return -1;
+  if(argfd(0, 0, &f) < 0)
+    return -1;
+
+  return fileseek(f, offset, whence);
+}
